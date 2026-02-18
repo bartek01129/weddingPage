@@ -1,0 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&family=Montserrat:wght@400;500;600;700&family=Lato:wght@300;400;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+	.btn-primary {
+		@apply px-6 py-3 bg-accent-green text-white rounded-full font-semibold hover:shadow-elegant hover:scale-105 transition-all;
+	}
+
+	.btn-secondary {
+		@apply px-6 py-3 border-2 border-accent-green text-text-main rounded-full font-semibold hover:bg-accent-green hover:text-white transition-all;
+	}
+
+	.card-hover {
+		@apply transition-all duration-300 hover:shadow-elegant;
+	}
+
+	.gradient-text {
+		background: linear-gradient(135deg, #3a4b40, #c5a059);
+		-webkit-background-clip: text;
+		-webkit-text-fill-color: transparent;
+	}
+}
+
+* {
+	margin: 0;
+	padding: 0;
+	box-sizing: border-box;
+}
+
+html {
+	scroll-behavior: smooth;
+}
+
+body {
+	background-color: #f3f0e7;
+	color: #3a4b40;
+	font-family: 'Montserrat', sans-serif;
+	line-height: 1.6;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar {
+	width: 10px;
+}
+
+::-webkit-scrollbar-track {
+	background: #f3f0e7;
+}
+
+::-webkit-scrollbar-thumb {
+	background: #c5a059;
+	border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: #3a4b40;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+	transition: all 0.3s ease;
+}
+
+::selection {
+	background-color: #c5a059;
+	color: #ffffff;
+}
+
+button:focus,
+button:focus-visible {
+	outline: 4px auto -webkit-focus-ring-color;
+}

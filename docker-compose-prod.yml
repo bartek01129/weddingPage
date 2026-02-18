@@ -1,0 +1,43 @@
+services:
+  backend:
+    image: ${DOCKER_USERNAME}/slubpaulinabartek:backend
+    container_name: slubpaulinabartek-backend
+    restart: unless-stopped
+    environment:
+      - PORT=3001
+      - FRONTEND_URL=https://slubpaulinabartek.pl
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - COUPLE_EMAIL=${COUPLE_EMAIL}
+      - COUPLE_NAMES=${COUPLE_NAMES}
+    networks:
+      - web
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.slub-api.rule=Host(`slubpaulinabartek.pl`) && PathPrefix(`/api`)'
+      - 'traefik.http.routers.slub-api.entrypoints=websecure'
+      - 'traefik.http.routers.slub-api.tls.certresolver=my-resolver'
+      - 'traefik.http.routers.slub-api.priority=20'
+      - 'traefik.http.services.slub-api.loadbalancer.server.port=3001'
+
+  frontend:
+    image: ${DOCKER_USERNAME}/slubpaulinabartek:frontend
+    container_name: slubpaulinabartek-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - web
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.slub-frontend.rule=Host(`slubpaulinabartek.pl`)'
+      - 'traefik.http.routers.slub-frontend.entrypoints=websecure'
+      - 'traefik.http.routers.slub-frontend.tls.certresolver=my-resolver'
+      - 'traefik.http.services.slub-frontend.loadbalancer.server.port=3000'
+
+networks:
+  web:
+    external: true
+    name: traefik_proxy_network
