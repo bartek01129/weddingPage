@@ -60,7 +60,7 @@ export default function PhotoBooth() {
 				}
 			}
 		} catch (err) {
-			alert('Wystąpił błąd podczas przesyłania zdjęcia. Spróbuj ponownie!');
+			alert('Wystąpił błąd podczas przesyłania zdjęcia');
 		} finally {
 			setUploading(false);
 			e.target.value = '';

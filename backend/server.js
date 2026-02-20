@@ -292,7 +292,7 @@ app.post('/api/photos', async (req, res) => {
 	}
 });
 
-// Start
+// Start backend
 initDB()
 	.then(() => {
 		app.listen(PORT, () => {
