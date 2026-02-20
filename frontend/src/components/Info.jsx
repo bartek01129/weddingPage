@@ -59,7 +59,7 @@ export default function Info() {
 					className='text-center mb-16'
 					initial={{ opacity: 0, y: -20 }}
 					whileInView={{ opacity: 1, y: 0 }}
-					transition={{ duration: 0.8 }}
+					transition={{ duration: 0.4 }}
 					viewport={{ once: true }}
 				>
 					<h2 className='text-4xl md:text-5xl font-serif text-white mb-4'>
@@ -76,6 +76,7 @@ export default function Info() {
 							variants={cardVariants}
 							initial='hidden'
 							whileInView='visible'
+							transition={{ duration: 0.1 }}
 							viewport={{ once: true }}
 							className='bg-white/20 backdrop-blur-sm rounded-xl p-6 shadow-soft hover:shadow-elegant transition-shadow'
 						>

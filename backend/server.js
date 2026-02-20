@@ -51,6 +51,17 @@ async function initDB() {
       )
     `);
 
+		await conn.execute(`
+			CREATE TABLE IF NOT EXISTS rsvps (
+				id INT AUTO_INCREMENT PRIMARY KEY,
+				name VARCHAR(255) NOT NULL,
+				attending ENUM('yes', 'no') NOT NULL,
+				guests INT DEFAULT 0,
+				companions JSON,
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+			)
+		`);
+
 		conn.release();
 		console.log('Database ready');
 	} catch (err) {
@@ -111,6 +122,11 @@ app.post('/api/rsvp', async (req, res) => {
 				${companionsList ? `<p><strong>Osoby towarzyszące:</strong></p><ul>${companionsList}</ul>` : ''}
 			`,
 		});
+
+		await pool.execute(
+			'INSERT INTO rsvps (name, attending, guests, companions) VALUES (?, ?, ?, ?)',
+			[name.trim(), attending, guests || 0, JSON.stringify(companions) || null],
+		);
 
 		res.json({ success: true, message: 'RSVP zostało wysłane pomyślnie!' });
 	} catch (error) {

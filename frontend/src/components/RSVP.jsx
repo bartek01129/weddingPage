@@ -234,7 +234,7 @@ export default function RSVP() {
 														<p className='text-sm text-text-main mb-2'>
 															Osoba {index + 1}
 														</p>
-														<div className='flex gap-3'>
+														<div className='grid md:grid-cols-2 grid-cols-1 gap-3'>
 															<input
 																type='text'
 																value={companion.firstName}

@@ -3,11 +3,10 @@ import { motion } from 'framer-motion';
 
 const locations = [
 	{
-		title: 'Ceremonii Ślubnej',
+		title: 'Ceremonia Ślubna',
 		name: 'Kościół na Świętym Krzyżu',
 		address: 'ul. Klasztorna 1, 26-016 Nowa Słupia',
 		time: 'Ceremonia 15:00',
-		region: 'Świętokrzyskie',
 		embedSrc:
 			'https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d6197.804067854249!2d21.052971!3d50.8594469!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x47181c7dc99d721b%3A0x346e39cf2ad9519a!2sKlasztor%20Misjonarzy%20Oblat%C3%B3w%20Maryi%20Niepokalanej-%20Sanktuarium%20Relikwii%20Drzewa%20Krzy%C5%BCa%20%C5%9Awi%C4%99tego!5e1!3m2!1sen!2spl!4v1771369079322!5m2!1sen!2spl',
 		mapsUrl:
@@ -16,11 +15,10 @@ const locations = [
 		animateX: -30,
 	},
 	{
-		title: 'Przyjęcia Weselnego',
+		title: 'Przyjęcie Weselne',
 		name: 'Hotel Echo',
 		address: 'ul. Główna 12, 26-060 Cedzyna',
 		time: 'Przyjęcie 17:00',
-		region: 'Świętokrzyskie',
 		embedSrc:
 			'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d14464.702794548806!2d20.7208445679792!3d50.872042726223604!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x471827368e8027cd%3A0xc4ba8d2ab9fbb6e7!2sHotel%20ECHO!5e1!3m2!1sen!2spl!4v1769970152763!5m2!1sen!2spl',
 		mapsUrl:
@@ -84,7 +82,6 @@ export default function Map() {
 											{loc.address}
 										</p>
 										<p className='text-s text-text-main/60'>{loc.time}</p>
-										<p className='text-s text-text-main/60'>{loc.region}</p>
 									</div>
 
 									<a
