@@ -1,4 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import {
+	BrowserRouter as Router,
+	Routes,
+	Route,
+	Navigate,
+	Link,
+} from 'react-router-dom';
 import Hero from './components/Hero';
 import Info from './components/Info';
 import Map from './components/Map';
@@ -9,47 +16,86 @@ import Welcome from './components/Welcome';
 import Gifts from './components/Gifts';
 import Contact from './components/Contact';
 import PasswordProtection from './components/PasswordProtection';
-import './App.css';
 import Songs from './components/Songs';
+import PhotoBooth from './components/page/PhotoBooth';
+import './App.css';
 
 export default function App() {
 	const [isAuthenticated, setIsAuthenticated] = useState(
 		sessionStorage.getItem('weddingAuth') === 'authenticated',
 	);
 
-	useEffect(() => {
-		const handleBeforeUnload = () => {
-			// Session storage is cleared automatically when the tab is closed
-		};
-		window.addEventListener('beforeunload', handleBeforeUnload);
-		return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-	}, []);
-
 	const handleAuthSuccess = () => {
 		setIsAuthenticated(true);
 	};
 
-	if (!isAuthenticated) {
-		return <PasswordProtection onSuccess={handleAuthSuccess} />;
-	}
-
 	return (
-		<main className='min-h-screen bg-primary-bg text-text-main overflow-x-hidden'>
-			<ScrollToTopButton />
-			<Hero />
-			<Countdown />
-			<Welcome />
-			<Info />
-			<Map />
-			<RSVP />
-			<Gifts />
-			<Contact />
-			<Songs />
-			<Footer />
-		</main>
+		<Router>
+			<main className='min-h-screen bg-primary-bg text-text-main overflow-x-hidden'>
+				<ScrollToTopButton />
+
+				<Routes>
+					{/* STRONA GŁÓWNA */}
+					<Route
+						path='/'
+						element={
+							!isAuthenticated ? (
+								<PasswordProtection onSuccess={handleAuthSuccess} />
+							) : (
+								<>
+									<Hero />
+									<Countdown />
+									<Welcome />
+
+									{/* Przycisk zachęcający do wejścia do galerii */}
+									<section className='py-12 bg-white/30 backdrop-blur-sm text-center'>
+										<div className='max-w-4xl mx-auto px-4'>
+											<h3 className='text-2xl font-serif font-bold text-accent-green mb-6'>
+												Podziel się z nami swoimi chwilami!
+											</h3>
+											<Link
+												to='/galeria'
+												className='inline-block bg-accent-green text-white px-10 py-4 rounded-full font-bold shadow-lg hover:scale-105 transition-transform'
+											>
+												Otwórz Galerię Zdjęć
+											</Link>
+										</div>
+									</section>
+
+									<Info />
+									<Map />
+									<RSVP />
+									<Gifts />
+									<Contact />
+									<Songs />
+									<Footer />
+								</>
+							)
+						}
+					/>
+
+					{/* PODSTRONA GALERII */}
+					<Route
+						path='/galeria'
+						element={
+							isAuthenticated ? (
+								<PhotoBooth />
+							) : (
+								/* Jeśli nie jest zalogowany, pokaż ekran hasła zamiast wyrzucać na stronę główną */
+								<PasswordProtection onSuccess={handleAuthSuccess} />
+							)
+						}
+					/>
+
+					{/* Obsługa błędnych adresów */}
+					<Route path='*' element={<Navigate to='/' />} />
+				</Routes>
+			</main>
+		</Router>
 	);
 }
 
+// Komponent przycisku "do góry" (bez zmian, jest poprawny)
 function ScrollToTopButton() {
 	const [isVisible, setIsVisible] = useState(false);
 

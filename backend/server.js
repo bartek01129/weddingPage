@@ -62,6 +62,15 @@ async function initDB() {
 			)
 		`);
 
+		await conn.execute(`
+			CREATE TABLE IF NOT EXISTS photos (
+				id INT AUTO_INCREMENT PRIMARY KEY,
+				url VARCHAR(500) NOT NULL,
+				public_id VARCHAR(255),
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+			)
+		`);
+
 		conn.release();
 		console.log('Database ready');
 	} catch (err) {
@@ -255,6 +264,31 @@ app.get('/api/songs/voted', async (req, res) => {
 	} catch (err) {
 		console.error(err);
 		res.status(500).json({ error: 'Błąd serwera.' });
+	}
+});
+
+//CLOUDINARY - PHOTO BOOTH
+app.get('/api/photos', async (req, res) => {
+	try {
+		const [rows] = await pool.execute(
+			'SELECT * FROM photos ORDER BY created_at DESC',
+		);
+		res.json(rows);
+	} catch (err) {
+		res.status(500).json({ error: 'Błąd pobierania zdjęć z cloud' });
+	}
+});
+
+app.post('/api/photos', async (req, res) => {
+	const { url, public_id } = req.body;
+	try {
+		await pool.execute('INSERT INTO photos (url, public_id) VALUES (?, ?)', [
+			url,
+			public_id,
+		]);
+		res.json({ success: true });
+	} catch (err) {
+		res.status(500).json({ error: 'Błąd zapisu zdjęcia' });
 	}
 });
 

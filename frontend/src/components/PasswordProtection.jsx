@@ -14,8 +14,29 @@ export default function PasswordProtection({ onSuccess }) {
 		const sessionAuth = sessionStorage.getItem('weddingAuth');
 		if (sessionAuth === 'authenticated') {
 			onSuccess();
+			return;
 		}
-	}, [onSuccess]);
+
+		// Wyciąganie hasła z linku (slubpaulinabartek.pl/?pwd=tajnehaslo)
+		const urlParams = new URLSearchParams(window.location.search);
+		const pwdFromUrl = urlParams.get('pwd');
+
+		if (pwdFromUrl && pwdFromUrl === CORRECT_PASSWORD) {
+			sessionStorage.setItem('weddingAuth', 'authenticated');
+			// Czyszczenie paska adresu, żeby hasło nie wisiało w URL
+			window.history.replaceState(null, '', window.location.pathname);
+			onSuccess();
+		}
+
+		// Security: Disable developer tools detection (basic)
+		const disableDevTools = (e) => {
+			if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I')) {
+				e.preventDefault();
+			}
+		};
+		document.addEventListener('keydown', disableDevTools);
+		return () => document.removeEventListener('keydown', disableDevTools);
+	}, [onSuccess, CORRECT_PASSWORD]);
 
 	const handleSubmit = (e) => {
 		e.preventDefault();
