@@ -6,7 +6,6 @@ app.get('/', (req, res) => {
 	res.json({ message: 'Wedding API działa 💍' });
 });
 
-// Dla jasności – możemy też dodać /api
 app.get('/api', (req, res) => {
 	res.json({ message: 'Wedding API działa 💍' });
 });

@@ -17,7 +17,6 @@ export default function PasswordProtection({ onSuccess }) {
 			return;
 		}
 
-		// Wyciąganie hasła z linku (slubpaulinabartek.pl/?pwd=tajnehaslo)
 		const urlParams = new URLSearchParams(window.location.search);
 		const pwdFromUrl = urlParams.get('pwd');
 

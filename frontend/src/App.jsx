@@ -47,7 +47,6 @@ export default function App() {
 									<Countdown />
 									<Welcome />
 
-									{/* Przycisk zachęcający do wejścia do galerii */}
 									<section className='py-12 bg-white/30 backdrop-blur-sm text-center'>
 										<div className='max-w-4xl mx-auto px-4'>
 											<h3 className='text-2xl font-serif font-bold text-accent-green mb-6'>
@@ -81,7 +80,6 @@ export default function App() {
 							isAuthenticated ? (
 								<PhotoBooth />
 							) : (
-								/* Jeśli nie jest zalogowany, pokaż ekran hasła zamiast wyrzucać na stronę główną */
 								<PasswordProtection onSuccess={handleAuthSuccess} />
 							)
 						}
@@ -95,7 +93,6 @@ export default function App() {
 	);
 }
 
-// Komponent przycisku "do góry" (bez zmian, jest poprawny)
 function ScrollToTopButton() {
 	const [isVisible, setIsVisible] = useState(false);
 

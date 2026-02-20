@@ -23,7 +23,7 @@ const transporter = nodemailer.createTransport({
 	},
 });
 
-// MariaDB
+// MariaDB setup
 const pool = mysql.createPool(process.env.DB_URL);
 
 async function initDB() {
@@ -163,7 +163,7 @@ app.post('/api/songs', async (req, res) => {
 	const { title, artist, link } = req.body;
 
 	if (!title?.trim() || !artist?.trim()) {
-		return res.status(400).json({ error: 'Tytuł i wykonawca są wymagane.' });
+		return res.status(400).json({ error: 'Tytuł oraz wykonawca są wymagane.' });
 	}
 
 	try {

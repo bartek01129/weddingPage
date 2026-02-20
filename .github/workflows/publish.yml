@@ -4,13 +4,14 @@ on:
   push:
     branches: [main]
     paths:
-      - 'backend/src/**'
+      - 'backend/server.js'
       - 'backend/package.json'
       - 'backend/Dockerfile'
       - 'frontend/src/**'
       - 'frontend/package.json'
       - 'frontend/Dockerfile'
       - 'docker-compose-prod.yml'
+      - '.github/workflows/publish.yml'
 
 jobs:
   changes:
@@ -60,7 +61,7 @@ jobs:
           context: ./backend
           file: ./backend/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/slubpaulinabartek:backend
+          tags: ${{ secrets.DOCKER_USERNAME }}/bartek:slubpaulinabartek-backend
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -102,7 +103,7 @@ jobs:
           context: ./frontend
           file: ./frontend/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/slubpaulinabartek:frontend
+          tags: ${{ secrets.DOCKER_USERNAME }}/bartek:slubpaulinabartek-frontend
           build-args: |
             VITE_PASSWORD=${{ secrets.VITE_PASSWORD }}
             VITE_CLOUDINARY_CLOUD_NAME=${{ secrets.VITE_CLOUDINARY_CLOUD_NAME }}
@@ -153,8 +154,8 @@ jobs:
             export COUPLE_NAMES="${{ secrets.COUPLE_NAMES }}"
             export DB_URL="${{ secrets.DB_URL }}"
 
-            docker pull ${{ secrets.DOCKER_USERNAME }}/slubpaulinabartek:backend
-            docker pull ${{ secrets.DOCKER_USERNAME }}/slubpaulinabartek:frontend
+            docker pull ${{ secrets.DOCKER_USERNAME }}/bartek:slubpaulinabartek-backend
+            docker pull ${{ secrets.DOCKER_USERNAME }}/bartek:slubpaulinabartek-frontend
 
             docker compose -f docker-compose-prod.yml up -d --remove-orphans
 

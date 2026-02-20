@@ -18,7 +18,7 @@ const infoCards = [
 	{
 		id: 1,
 		title: 'Zupa',
-		time: '?',
+		time: '18:40',
 		description: 'Rosół z kury z makaronem',
 	},
 	{
