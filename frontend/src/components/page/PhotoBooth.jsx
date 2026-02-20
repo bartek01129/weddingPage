@@ -17,7 +17,6 @@ export default function PhotoBooth() {
 		try {
 			const res = await fetch(API_URL);
 			const data = await res.json();
-			// Sortujemy zdjęcia od najnowszych, jeśli backend tego nie robi
 			setPhotos(data);
 		} catch (err) {
 			console.error('Błąd pobierania galerii');
