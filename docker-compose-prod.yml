@@ -10,8 +10,10 @@ services:
       - SMTP_PORT=${SMTP_PORT}
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASS=${SMTP_PASS}
+      - SONGS_ADMIN_PASSWORD=${SONGS_ADMIN_PASSWORD}
       - COUPLE_EMAIL=${COUPLE_EMAIL}
       - COUPLE_NAMES=${COUPLE_NAMES}
+      - DB_URL=${DB_URL}
     networks:
       - web
     labels:
@@ -20,6 +22,7 @@ services:
       - 'traefik.http.routers.slub-api.entrypoints=websecure'
       - 'traefik.http.routers.slub-api.tls.certresolver=my-resolver'
       - 'traefik.http.routers.slub-api.priority=20'
+      - 'traefik.http.routers.slub-api.service=slub-api'
       - 'traefik.http.services.slub-api.loadbalancer.server.port=3001'
 
   frontend:
@@ -32,10 +35,22 @@ services:
       - web
     labels:
       - 'traefik.enable=true'
-      - 'traefik.http.routers.slub-frontend.rule=Host(`slubpaulinabartek.pl`)'
-      - 'traefik.http.routers.slub-frontend.entrypoints=websecure'
-      - 'traefik.http.routers.slub-frontend.tls.certresolver=my-resolver'
-      - 'traefik.http.services.slub-frontend.loadbalancer.server.port=3000'
+
+      - "traefik.http.middlewares.www-redirect.redirectregex.regex=^https?://www\\.(.*)"
+      - 'traefik.http.middlewares.www-redirect.redirectregex.replacement=https://$${1}'
+
+      - 'traefik.http.routers.www-slub-redirect.rule=Host(`www.slubpaulinabartek.pl`)'
+      - 'traefik.http.routers.www-slub-redirect.entrypoints=websecure'
+      - 'traefik.http.routers.www-slub-redirect.tls.certresolver=my-resolver'
+      - 'traefik.http.routers.www-slub-redirect.middlewares=www-redirect'
+
+      - 'traefik.http.routers.slub.rule=Host(`slubpaulinabartek.pl`)'
+      - 'traefik.http.routers.slub.entrypoints=websecure'
+      - 'traefik.http.routers.slub.tls=true'
+      - 'traefik.http.routers.slub.tls.certresolver=my-resolver'
+      - 'traefik.http.routers.slub.priority=10'
+      - 'traefik.http.routers.slub.service=slub'
+      - 'traefik.http.services.slub.loadbalancer.server.port=3000'
 
 networks:
   web:

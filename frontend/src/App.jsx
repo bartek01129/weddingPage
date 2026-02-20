@@ -10,6 +10,7 @@ import Gifts from './components/Gifts';
 import Contact from './components/Contact';
 import PasswordProtection from './components/PasswordProtection';
 import './App.css';
+import Songs from './components/Songs';
 
 export default function App() {
 	const [isAuthenticated, setIsAuthenticated] = useState(
@@ -43,6 +44,7 @@ export default function App() {
 			<RSVP />
 			<Gifts />
 			<Contact />
+			<Songs />
 			<Footer />
 		</main>
 	);
@@ -71,7 +73,12 @@ function ScrollToTopButton() {
 			className='fixed bottom-8 right-8 p-3 bg-accent-green text-white rounded-full shadow-elegant hover:shadow-soft hover:scale-110 transition-all z-50'
 			title='Powrót do góry'
 		>
-			<svg className='w-6 h-6' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+			<svg
+				className='w-6 h-6'
+				fill='none'
+				stroke='currentColor'
+				viewBox='0 0 24 24'
+			>
 				<path
 					strokeLinecap='round'
 					strokeLinejoin='round'

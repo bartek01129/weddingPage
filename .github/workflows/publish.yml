@@ -146,8 +146,10 @@ jobs:
             export SMTP_PORT="${{ secrets.SMTP_PORT }}"
             export SMTP_USER="${{ secrets.SMTP_USER }}"
             export SMTP_PASS="${{ secrets.SMTP_PASS }}"
+            export SONGS_ADMIN_PASSWORD="${{ secrets.SONGS_ADMIN_PASSWORD }}"
             export COUPLE_EMAIL="${{ secrets.COUPLE_EMAIL }}"
             export COUPLE_NAMES="${{ secrets.COUPLE_NAMES }}"
+            export DB_URL="${{ secrets.DB_URL }}"
 
             docker pull ${{ secrets.DOCKER_USERNAME }}/slubpaulinabartek:backend
             docker pull ${{ secrets.DOCKER_USERNAME }}/slubpaulinabartek:frontend

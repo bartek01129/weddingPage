@@ -340,7 +340,7 @@ export default function RSVP() {
 											href='mailto:kontakt@naszslub.pl'
 											className='underline hover:text-accent-green transition-colors'
 										>
-											kontakt@naszslub.pl
+											bartek011229@gmail.com
 										</a>
 									</p>
 								</div>
