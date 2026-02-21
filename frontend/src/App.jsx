@@ -19,6 +19,7 @@ import PasswordProtection from './components/PasswordProtection';
 import Songs from './components/Songs';
 import PhotoBooth from './components/page/PhotoBooth';
 import './App.css';
+import Agenda from './components/Agenda';
 
 export default function App() {
 	const [isAuthenticated, setIsAuthenticated] = useState(
@@ -60,7 +61,7 @@ export default function App() {
 											</Link>
 										</div>
 									</section>
-
+									<Agenda />
 									<Info />
 									<Map />
 									<RSVP />

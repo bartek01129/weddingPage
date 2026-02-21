@@ -8,6 +8,7 @@ export default {
 			colors: {
 				'primary-bg': '#F3F0E7',
 				'accent-green': '#3A4B40',
+				'info-green': '#253B2D',
 				'accent-gold': '#C5A059',
 				'text-main': '#3A4B40',
 				'light-gray': '#EFEAE3',

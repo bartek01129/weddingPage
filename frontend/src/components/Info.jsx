@@ -53,7 +53,7 @@ const infoCards = [
 
 export default function Info() {
 	return (
-		<section id='info' className='py-20 px-4 bg-accent-green'>
+		<section id='info' className='py-20 px-4 bg-info-green'>
 			<div className='max-w-7xl mx-auto'>
 				<motion.div
 					className='text-center mb-16'
