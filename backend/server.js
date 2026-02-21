@@ -62,7 +62,7 @@ async function initDB() {
 				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 				ip VARCHAR(45),
 				user_agent VARCHAR(500),
-				geo JSON			
+				geo VARCHAR(255)
 			)
 		`);
 
@@ -160,7 +160,7 @@ app.post('/api/rsvp', async (req, res) => {
 				JSON.stringify(companions) || null,
 				ip,
 				userAgent,
-				JSON.stringify(geo) || null,
+				geo?.city || null,
 			],
 		);
 
