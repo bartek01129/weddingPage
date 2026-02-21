@@ -84,7 +84,7 @@ export default function Songs() {
 	const handleAddSong = async (e) => {
 		e.preventDefault();
 		if (!title.trim() || !artist.trim()) {
-			setAddError('Wypełnij wszystkie pola.');
+			setAddError('Wypełnij wszystkie wymagane pola.');
 			return;
 		}
 		setIsAdding(true);
