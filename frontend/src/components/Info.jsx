@@ -39,7 +39,7 @@ const infoCards = [
 	},
 	{
 		id: 5,
-		title: 'Początek Nocny',
+		title: 'Poczęstunek Nocny',
 		description: 'Żurek',
 	},
 ];
