@@ -58,7 +58,9 @@ async function initDB() {
 				attending ENUM('yes', 'no') NOT NULL,
 				guests INT DEFAULT 0,
 				companions JSON,
-				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				ip VARCHAR(45),
+				user_agent VARCHAR(500)
 			)
 		`);
 
@@ -87,6 +89,16 @@ function getRole(password) {
 	return null;
 }
 
+//IP get
+function getClientInfo(req) {
+	const ip =
+		req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+		req.socket.remoteAddress ||
+		'unknown';
+	const userAgent = req.headers['user-agent']?.slice(0, 500) || 'unknown';
+	return { ip, userAgent };
+}
+
 // Health check
 app.get('/health', (req, res) => {
 	res.json({ status: 'ok' });
@@ -107,6 +119,10 @@ app.post('/api/rsvp', async (req, res) => {
 			.status(400)
 			.json({ error: 'Proszę podać imiona osób towarzyszących.' });
 	}
+
+	const client = getClientInfo(req);
+	const ip = client.ip;
+	const userAgent = client.userAgent;
 
 	const companionsList =
 		Array.isArray(companions) && companions.length > 0
@@ -133,8 +149,15 @@ app.post('/api/rsvp', async (req, res) => {
 		});
 
 		await pool.execute(
-			'INSERT INTO rsvps (name, attending, guests, companions) VALUES (?, ?, ?, ?)',
-			[name.trim(), attending, guests || 0, JSON.stringify(companions) || null],
+			'INSERT INTO rsvps (name, attending, guests, companions, ip, user_agent) VALUES (?, ?, ?, ?, ?, ?)',
+			[
+				name.trim(),
+				attending,
+				guests || 0,
+				JSON.stringify(companions) || null,
+				ip,
+				userAgent,
+			],
 		);
 
 		res.json({ success: true, message: 'RSVP zostało wysłane pomyślnie!' });
@@ -184,11 +207,9 @@ app.post('/api/songs', async (req, res) => {
 app.post('/api/songs/:id/upvote', async (req, res) => {
 	const { id } = req.params;
 
-	const ip =
-		req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-		req.socket.remoteAddress ||
-		'unknown';
-	const userAgent = req.headers['user-agent']?.slice(0, 500) || 'unknown';
+	const client = getClientInfo(req);
+	const ip = client.ip;
+	const userAgent = client.userAgent;
 
 	try {
 		const [existing] = await pool.execute('SELECT id FROM songs WHERE id = ?', [
