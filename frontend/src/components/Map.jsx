@@ -18,7 +18,7 @@ const locations = [
 		title: 'Przyjęcie Weselne',
 		name: 'Hotel Echo',
 		address: 'ul. Główna 12, 26-060 Cedzyna',
-		time: 'Przyjęcie 16:30',
+		time: 'Przyjęcie 17:00',
 		embedSrc:
 			'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d14464.702794548806!2d20.7208445679792!3d50.872042726223604!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x471827368e8027cd%3A0xc4ba8d2ab9fbb6e7!2sHotel%20ECHO!5e1!3m2!1sen!2spl!4v1769970152763!5m2!1sen!2spl',
 		mapsUrl:

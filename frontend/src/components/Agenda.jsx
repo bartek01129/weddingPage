@@ -22,7 +22,7 @@ const infoCards = [
 	},
 	{
 		id: 2,
-		title: 'Powitanie Gości i Rozpoczęcie Przyjęcia',
+		title: 'Powitanie Gości na Sali i Rozpoczęcie Przyjęcia',
 		time: '17:00',
 	},
 	{

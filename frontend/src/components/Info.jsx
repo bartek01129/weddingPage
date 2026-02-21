@@ -17,37 +17,30 @@ const cardVariants = {
 const infoCards = [
 	{
 		id: 1,
-		title: 'Zupa',
-		time: '18:40',
+		title: 'Obiad Weselny',
 		description: 'Rosół z kury z makaronem',
 	},
 	{
 		id: 2,
-		title: 'Danie Główne',
-		time: '?',
+		title: 'Obiad Weselny',
 		description:
 			'Filet z kurczaka faszerowany szpinakiem i serem mozzarella, sos pieprzowy, gratin ziemniaczany i zestaw surówek',
 	},
 	{
 		id: 3,
-		title: 'II Danie',
-		time: '?',
+		title: 'Kolacja Wieczorna',
 		description:
 			'Karczek w sosie myśliwskim, kluski śląskie i surówka z kieszonego ogórka',
 	},
 	{
-		id: 3,
-		title: 'III Danie',
-		time: '?',
-		description:
-			'Karczek w sosie myśliwskim, kluski śląskie i surówka z kieszonego ogórka',
+		id: 4,
+		title: 'Kolacja Nocna',
+		description: 'Strogonof wołowy z świeżo wypiekaną bagietką',
 	},
 	{
-		id: 3,
-		title: 'IV Danie',
-		time: '?',
-		description:
-			'Karczek w sosie myśliwskim, kluski śląskie i surówka z kieszonego ogórka',
+		id: 5,
+		title: 'Początek Nocny',
+		description: 'Żurek',
 	},
 ];
 
@@ -80,24 +73,11 @@ export default function Info() {
 							viewport={{ once: true }}
 							className='bg-white/20 backdrop-blur-sm rounded-xl p-6 shadow-soft hover:shadow-elegant transition-shadow'
 						>
-							<h3 className='text-lg font-serif font-bold text-white mb-3'>
+							<h3 className='text-lg font-serif font-bold text-accent-gold mb-3'>
 								{card.title}
 							</h3>
-							{card.time && (
-								<p className='text-accent-gold font-semibold text-base mb-1'>
-									{card.time}
-								</p>
-							)}
 							{card.description && (
 								<p className='text-ss text-white/80 mb-3'>{card.description}</p>
-							)}
-							{card.location && (
-								<p className='font-semibold text-white text-sm mb-1'>
-									{card.location}
-								</p>
-							)}
-							{card.address && (
-								<p className='text-xs text-white/70'>{card.address}</p>
 							)}
 						</motion.div>
 					))}
