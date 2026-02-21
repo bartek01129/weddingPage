@@ -161,8 +161,6 @@ app.post('/api/rsvp', async (req, res) => {
 				ip,
 				userAgent,
 				JSON.stringify(geo) || null,
-				ip,
-				userAgent,
 			],
 		);
 
