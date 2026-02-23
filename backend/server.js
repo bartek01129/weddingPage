@@ -58,7 +58,7 @@ async function initDB() {
 				attending ENUM('yes', 'no') NOT NULL,
 				guests INT DEFAULT 0,
 				companions JSON,
-				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 			)
 		`);
 
