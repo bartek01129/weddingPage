@@ -3,7 +3,6 @@ import cors from 'cors';
 import nodemailer from 'nodemailer';
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
-import geoip from 'geoip-lite';
 
 dotenv.config();
 
@@ -60,9 +59,6 @@ async function initDB() {
 				guests INT DEFAULT 0,
 				companions JSON,
 				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-				ip VARCHAR(45),
-				user_agent VARCHAR(500),
-				geo VARCHAR(255)
 			)
 		`);
 
@@ -123,9 +119,6 @@ app.post('/api/rsvp', async (req, res) => {
 	}
 
 	const client = getClientInfo(req);
-	const ip = client.ip;
-	const userAgent = client.userAgent;
-	const geo = geoip.lookup(ip);
 
 	const companionsList =
 		Array.isArray(companions) && companions.length > 0
@@ -152,16 +145,8 @@ app.post('/api/rsvp', async (req, res) => {
 		});
 
 		await pool.execute(
-			'INSERT INTO rsvps (name, attending, guests, companions, ip, user_agent, geo) VALUES (?, ?, ?, ?, ?, ?, ?)',
-			[
-				name.trim(),
-				attending,
-				guests || 0,
-				JSON.stringify(companions) || null,
-				ip,
-				userAgent,
-				geo?.city || null,
-			],
+			'INSERT INTO rsvps (name, attending, guests, companions, ip, user_agent) VALUES (?, ?, ?, ?)',
+			[name.trim(), attending, guests || 0, JSON.stringify(companions) || null],
 		);
 
 		res.json({ success: true, message: 'RSVP zostało wysłane pomyślnie!' });
