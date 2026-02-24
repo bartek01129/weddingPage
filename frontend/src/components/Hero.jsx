@@ -80,7 +80,7 @@ export default function Hero() {
 				<motion.div variants={itemVariants} className='flex justify-center'>
 					<a
 						href='#rsvp'
-						className='px-10 py-3 bg-accent-green text-white rounded-full font-semibold text-base shadow-soft hover:shadow-elegant hover:scale-105 transform transition-all duration-300'
+						className='px-1 py-3 border border-white/60 text-white backdrop-blur-sm font-serif text-lg tracking-widest uppercase hover:bg-white/20 transition-all duration-300'
 					>
 						Potwierdź Przybycie
 					</a>

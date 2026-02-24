@@ -118,8 +118,6 @@ app.post('/api/rsvp', async (req, res) => {
 			.json({ error: 'Proszę podać imiona osób towarzyszących.' });
 	}
 
-	const client = getClientInfo(req);
-
 	const companionsList =
 		Array.isArray(companions) && companions.length > 0
 			? companions
