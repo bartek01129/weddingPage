@@ -36,13 +36,13 @@ services:
     labels:
       - 'traefik.enable=true'
 
-      - "traefik.http.middlewares.www-redirect.redirectregex.regex=^https?://www\\.(.*)"
-      - 'traefik.http.middlewares.www-redirect.redirectregex.replacement=https://$${1}'
+      - "traefik.http.middlewares.slub-www-redirect.redirectregex.regex=^https?://www\\.(.*)"
+      - 'traefik.http.middlewares.slub-www-redirect.redirectregex.replacement=https://$${1}'
 
       - 'traefik.http.routers.www-slub-redirect.rule=Host(`www.slubpaulinabartek.pl`)'
       - 'traefik.http.routers.www-slub-redirect.entrypoints=websecure'
       - 'traefik.http.routers.www-slub-redirect.tls.certresolver=my-resolver'
-      - 'traefik.http.routers.www-slub-redirect.middlewares=www-redirect'
+      - 'traefik.http.routers.www-slub-redirect.middlewares=slub-www-redirect'
 
       - 'traefik.http.routers.slub.rule=Host(`slubpaulinabartek.pl`)'
       - 'traefik.http.routers.slub.entrypoints=websecure'
