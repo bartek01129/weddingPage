@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import SectionHeading from './ui/SectionHeading';
 
 const API_URL = '/api/songs';
 
@@ -140,22 +141,12 @@ export default function Songs() {
 		<section id='songs' className='py-20 px-4 bg-primary-bg'>
 			<div className='max-w-3xl mx-auto'>
 				{/* Header */}
-				<motion.div
-					className='text-center mb-12'
-					initial={{ opacity: 0, y: -20 }}
-					whileInView={{ opacity: 1, y: 0 }}
-					transition={{ duration: 0.8 }}
-					viewport={{ once: true }}
-				>
-					<h2 className='text-4xl md:text-5xl font-serif text-text-main mb-4'>
-						Lista życzeń muzycznych
-					</h2>
-					<p className='text-text-main/70 text-base max-w-xl mx-auto'>
-						Zaproponuj utwór i zagłosuj na swoje ulubione piosenki. Pomożesz nam
-						stworzyć idealną playlistę!
-					</p>
-					<div className='w-16 h-1 bg-accent-gold mx-auto rounded-full mt-4' />
-				</motion.div>
+				<SectionHeading
+					eyebrow='Wspólna playlista'
+					title='Lista życzeń muzycznych'
+					subtitle='Zaproponuj utwór i zagłosuj na swoje ulubione piosenki. Pomożesz nam stworzyć idealną playlistę!'
+					className='mb-12'
+				/>
 
 				{/* Add song button */}
 				<motion.div
@@ -167,7 +158,7 @@ export default function Songs() {
 				>
 					<button
 						onClick={() => setShowAddForm(!showAddForm)}
-						className='inline-flex items-center gap-2 px-6 py-3 bg-accent-green text-white rounded-full font-semibold hover:bg-accent-green/90 hover:scale-105 transition-all shadow-soft'
+						className={showAddForm ? 'btn-secondary' : 'btn-primary'}
 					>
 						<svg
 							className='w-5 h-5'
@@ -196,14 +187,14 @@ export default function Songs() {
 							transition={{ duration: 0.3 }}
 							className='overflow-hidden mb-8'
 						>
-							<div className='bg-white rounded-2xl shadow-elegant p-6 border-l-4 border-accent-gold'>
-								<h3 className='text-lg font-serif font-semibold text-text-main mb-4'>
+							<div className='relative bg-white rounded-2xl shadow-card p-6 md:p-8 border border-accent-gold/30'>
+								<h3 className='text-xl font-serif font-medium text-text-main mb-4'>
 									Dodaj utwór
 								</h3>
 								<form onSubmit={handleAddSong} className='space-y-4'>
 									<div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
 										<div>
-											<label className='block text-sm font-semibold text-text-main mb-1'>
+											<label className='block text-xs font-semibold uppercase tracking-widest text-text-main/70 mb-2'>
 												Tytuł *
 											</label>
 											<input
@@ -211,11 +202,11 @@ export default function Songs() {
 												value={title}
 												onChange={(e) => setTitle(e.target.value)}
 												placeholder='Nazwa utworu'
-												className='w-full px-4 py-2.5 border-2 border-accent-green/30 rounded-xl bg-white focus:outline-none focus:border-accent-green transition-all text-text-main'
+												className='w-full px-4 py-2.5 border border-accent-green/25 rounded-lg bg-white focus:outline-none focus:border-accent-gold focus:ring-2 focus:ring-accent-gold/25 transition-all text-text-main placeholder:text-text-main/40 placeholder:font-light'
 											/>
 										</div>
 										<div>
-											<label className='block text-sm font-semibold text-text-main mb-1'>
+											<label className='block text-xs font-semibold uppercase tracking-widest text-text-main/70 mb-2'>
 												Wykonawca *
 											</label>
 											<input
@@ -223,11 +214,11 @@ export default function Songs() {
 												value={artist}
 												onChange={(e) => setArtist(e.target.value)}
 												placeholder='Artysta / zespół'
-												className='w-full px-4 py-2.5 border-2 border-accent-green/30 rounded-xl bg-white focus:outline-none focus:border-accent-green transition-all text-text-main'
+												className='w-full px-4 py-2.5 border border-accent-green/25 rounded-lg bg-white focus:outline-none focus:border-accent-gold focus:ring-2 focus:ring-accent-gold/25 transition-all text-text-main placeholder:text-text-main/40 placeholder:font-light'
 											/>
 										</div>
 										<div>
-											<label className='block text-sm font-semibold text-text-main mb-1'>
+											<label className='block text-xs font-semibold uppercase tracking-widest text-text-main/70 mb-2'>
 												Link
 											</label>
 											<input
@@ -235,7 +226,7 @@ export default function Songs() {
 												value={link}
 												onChange={(e) => setLink(e.target.value)}
 												placeholder='Link do utworu'
-												className='w-full px-4 py-2.5 border-2 border-accent-green/30 rounded-xl bg-white focus:outline-none focus:border-accent-green transition-all text-text-main'
+												className='w-full px-4 py-2.5 border border-accent-green/25 rounded-lg bg-white focus:outline-none focus:border-accent-gold focus:ring-2 focus:ring-accent-gold/25 transition-all text-text-main placeholder:text-text-main/40 placeholder:font-light'
 											/>
 										</div>
 									</div>
@@ -247,7 +238,7 @@ export default function Songs() {
 									<button
 										type='submit'
 										disabled={isAdding}
-										className='w-full py-3 bg-accent-green text-white rounded-full font-semibold hover:bg-accent-green/90 disabled:opacity-50 transition-all flex items-center justify-center gap-2'
+										className='btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed'
 									>
 										{isAdding ? (
 											<>
@@ -322,10 +313,10 @@ export default function Songs() {
 									animate={{ opacity: 1, y: 0 }}
 									exit={{ opacity: 0, x: -20 }}
 									transition={{ delay: index * 0.03 }}
-									className='bg-white rounded-xl shadow-softer p-4 flex items-center gap-4'
+									className='bg-white rounded-xl shadow-softer border border-accent-green/10 p-4 flex items-center gap-4 hover:shadow-soft transition-shadow'
 								>
 									{/* Rank */}
-									<span className='text-2xl font-serif font-bold text-accent-gold/60 w-8 text-center flex-shrink-0'>
+									<span className='text-2xl font-serif italic font-medium text-accent-gold w-8 text-center flex-shrink-0'>
 										{index + 1}
 									</span>
 
@@ -343,10 +334,10 @@ export default function Songs() {
 									<button
 										onClick={() => handleUpvote(song.id)}
 										disabled={upvotedIds.has(song.id)}
-										className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all ${
+										className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-semibold border transition-all ${
 											upvotedIds.has(song.id)
-												? 'bg-accent-green/10 text-accent-green cursor-default'
-												: 'bg-accent-green/10 text-accent-green hover:bg-accent-green hover:text-white'
+												? 'border-accent-gold/40 bg-accent-gold/10 text-accent-gold cursor-default'
+												: 'border-accent-green/25 bg-white text-accent-green hover:bg-accent-green hover:border-accent-green hover:text-white'
 										}`}
 									>
 										<svg

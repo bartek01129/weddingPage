@@ -1,18 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-
-const cardVariants = {
-	hidden: { opacity: 0, y: 30 },
-	visible: (i) => ({
-		opacity: 1,
-		y: 0,
-		transition: {
-			delay: i * 0.2,
-			duration: 0.6,
-			ease: 'easeOut',
-		},
-	}),
-};
+import SectionHeading from './ui/SectionHeading';
 
 const infoCards = [
 	{
@@ -30,12 +18,12 @@ const infoCards = [
 		id: 3,
 		title: 'Kolacja Wieczorna',
 		description:
-			'Karczek w sosie myśliwskim, kluski śląskie i surówka z kieszonego ogórka',
+			'Karczek w sosie myśliwskim, kluski śląskie i surówka z kiszonego ogórka',
 	},
 	{
 		id: 4,
 		title: 'Kolacja Nocna',
-		description: 'Strogonof wołowy z świeżo wypiekaną bagietką',
+		description: 'Strogonof wołowy ze świeżo wypiekaną bagietką',
 	},
 	{
 		id: 5,
@@ -46,42 +34,59 @@ const infoCards = [
 
 export default function Info() {
 	return (
-		<section id='info' className='py-20 px-4 bg-info-green'>
+		<section id='info' className='py-20 md:py-24 px-4 bg-info-green'>
 			<div className='max-w-7xl mx-auto'>
-				<motion.div
-					className='text-center mb-16'
-					initial={{ opacity: 0, y: -20 }}
-					whileInView={{ opacity: 1, y: 0 }}
-					transition={{ duration: 0.4 }}
-					viewport={{ once: true }}
-				>
-					<h2 className='text-4xl md:text-5xl font-serif text-white mb-4'>
-						Potrawy
-					</h2>
-					<div className='w-16 h-1 bg-accent-gold mx-auto rounded-full' />
-				</motion.div>
+				<SectionHeading
+					eyebrow='Menu weselne'
+					title='Potrawy'
+					tone='light'
+					className='mb-14 md:mb-16'
+				/>
 
-				<div className='grid grid-cols-1 md:grid-cols-2 gap-8'>
-					{infoCards.map((card, i) => (
-						<motion.div
-							key={card.id}
-							custom={i}
-							variants={cardVariants}
-							initial='hidden'
-							whileInView='visible'
-							transition={{ duration: 0.1 }}
-							viewport={{ once: true }}
-							className='bg-white/20 backdrop-blur-sm rounded-xl p-6 shadow-soft hover:shadow-elegant transition-shadow'
-						>
-							<h3 className='text-lg font-serif font-bold text-accent-gold mb-3'>
-								{card.title}
-							</h3>
-							{card.description && (
-								<p className='text-ss text-white/80 mb-3'>{card.description}</p>
-							)}
-						</motion.div>
-					))}
-				</div>
+				{/* Karta menu */}
+				<motion.div
+					initial={{ opacity: 0, y: 24 }}
+					whileInView={{ opacity: 1, y: 0 }}
+					transition={{ duration: 0.8, ease: 'easeOut' }}
+					viewport={{ once: true }}
+					className='relative max-w-2xl mx-auto rounded-2xl border border-accent-gold/40 bg-white/5 backdrop-blur-sm p-8 md:p-14 text-center'
+				>
+					<span
+						className='pointer-events-none absolute inset-2 rounded-xl border border-accent-gold/20'
+						aria-hidden='true'
+					/>
+
+					{infoCards.map((card, i) => {
+						const isNewCourse =
+							i === 0 || infoCards[i - 1].title !== card.title;
+						return (
+							<React.Fragment key={card.id}>
+								{isNewCourse && i > 0 && (
+									<div
+										className='flex items-center justify-center gap-3 my-8'
+										aria-hidden='true'
+									>
+										<span className='h-px w-10 bg-gradient-to-r from-transparent to-accent-gold/50' />
+										<span className='block w-1 h-1 rotate-45 bg-accent-gold/70' />
+										<span className='h-px w-10 bg-gradient-to-r from-accent-gold/50 to-transparent' />
+									</div>
+								)}
+								{isNewCourse && (
+									<h3 className='font-serif italic text-accent-gold text-xl md:text-2xl mb-3'>
+										{card.title}
+									</h3>
+								)}
+								<p
+									className={`text-white/85 font-light text-sm md:text-base leading-relaxed max-w-lg mx-auto ${
+										isNewCourse ? '' : 'mt-3'
+									}`}
+								>
+									{card.description}
+								</p>
+							</React.Fragment>
+						);
+					})}
+				</motion.div>
 			</div>
 		</section>
 	);

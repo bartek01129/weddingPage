@@ -65,19 +65,39 @@ export default function PasswordProtection({ onSuccess }) {
 			transition={{ duration: 0.5 }}
 		>
 			<motion.div
-				className='bg-white/95 backdrop-blur-sm rounded-2xl shadow-elegant p-8 max-w-md w-full mx-4'
+				className='relative bg-white/95 backdrop-blur-sm rounded-2xl shadow-card p-8 md:p-10 max-w-md w-full mx-4'
 				initial={{ scale: 0.9, y: 20 }}
 				animate={{ scale: 1, y: 0 }}
 				transition={{ duration: 0.5, ease: 'easeOut' }}
 			>
-				<div className='text-center mb-8'>
-					<h1 className='text-3xl font-serif font-bold text-accent-green mb-2'>
-						Paulina & Bartek
+				<span
+					className='pointer-events-none absolute inset-2 rounded-xl border border-accent-gold/25'
+					aria-hidden='true'
+				/>
+
+				<div className='relative text-center mb-8'>
+					<p className='eyebrow mb-4'>Prywatne zaproszenie</p>
+					<h1 className='text-3xl md:text-4xl font-serif font-medium text-text-main mb-2'>
+						Paulina{' '}
+						<span className='font-serif italic font-normal text-accent-gold'>
+							&
+						</span>{' '}
+						Bartek
 					</h1>
-					<p className='text-text-main/75 text-sm'>Wpisz hasło, aby wejść</p>
+					<p className='font-serif italic text-accent-green/80 text-lg mb-5'>
+						22 sierpnia 2026
+					</p>
+					<div
+						className='flex items-center justify-center gap-3'
+						aria-hidden='true'
+					>
+						<span className='h-px w-12 bg-gradient-to-r from-transparent to-accent-gold/70' />
+						<span className='block w-1.5 h-1.5 rotate-45 bg-accent-gold' />
+						<span className='h-px w-12 bg-gradient-to-r from-accent-gold/70 to-transparent' />
+					</div>
 				</div>
 
-				<form onSubmit={handleSubmit} className='space-y-4'>
+				<form onSubmit={handleSubmit} className='relative space-y-4'>
 					<motion.div
 						animate={shake ? { x: [-10, 10, -10, 10, 0] } : {}}
 						transition={{ duration: 0.4 }}
@@ -89,8 +109,8 @@ export default function PasswordProtection({ onSuccess }) {
 								setPassword(e.target.value);
 								setError('');
 							}}
-							placeholder='Wpisz hasło'
-							className='w-full px-4 py-3 border-2 border-accent-green/30 rounded-lg focus:outline-none focus:border-accent-green text-text-main placeholder-text-main/50 transition-colors'
+							placeholder='Wpisz hasło, aby wejść'
+							className='w-full px-4 py-3 border border-accent-green/25 rounded-lg bg-white text-center focus:outline-none focus:border-accent-gold focus:ring-2 focus:ring-accent-gold/25 text-text-main placeholder:text-text-main/40 placeholder:font-light transition-all'
 							disabled={isLoading}
 							autoFocus
 						/>
@@ -109,8 +129,7 @@ export default function PasswordProtection({ onSuccess }) {
 					<motion.button
 						type='submit'
 						disabled={isLoading || !password}
-						className='w-full bg-accent-green hover:bg-accent-green/90 disabled:bg-accent-green/50 text-white font-semibold py-3 rounded-lg transition-all duration-300 flex items-center justify-center gap-2'
-						whileHover={{ scale: 1.02 }}
+						className='btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed'
 						whileTap={{ scale: 0.98 }}
 					>
 						{isLoading ? (
@@ -143,8 +162,8 @@ export default function PasswordProtection({ onSuccess }) {
 					</motion.button>
 				</form>
 
-				<p className='text-center text-xs text-text-main/50 mt-6'>
-					Prywatne zaproszenie na ślub
+				<p className='relative text-center text-xs font-light text-text-main/50 mt-6'>
+					Hasło znajdziesz w swoim zaproszeniu
 				</p>
 			</motion.div>
 		</motion.div>

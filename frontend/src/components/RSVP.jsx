@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { sendEmails } from '../utils/emailGenerator';
+import SectionHeading from './ui/SectionHeading';
+import Ornament from './ui/Ornament';
 
 export default function RSVP() {
 	const [step, setStep] = useState(1);
@@ -61,40 +63,36 @@ export default function RSVP() {
 	};
 
 	const inputClass =
-		'w-full px-4 py-3 border-2 border-accent-green/30 rounded-xl bg-white focus:outline-none focus:border-accent-green focus:ring-2 focus:ring-accent-gold/30 transition-all text-text-main placeholder-text-main/50';
+		'w-full px-4 py-3 border border-accent-green/25 rounded-lg bg-white focus:outline-none focus:border-accent-gold focus:ring-2 focus:ring-accent-gold/25 transition-all text-text-main placeholder:text-text-main/40 placeholder:font-light';
 
-	const labelClass = 'block text-sm font-semibold text-text-main mb-2';
+	const labelClass =
+		'block text-xs font-semibold uppercase tracking-widest text-text-main/70 mb-2';
 
 	return (
-		<section id='rsvp' className='py-20 px-4 bg-white/30'>
+		<section id='rsvp' className='py-20 md:py-24 px-4 bg-white/40'>
 			<div className='max-w-3xl mx-auto'>
-				{/* Header */}
-				<motion.div
-					className='text-center mb-12'
-					initial={{ opacity: 0, y: -20 }}
-					whileInView={{ opacity: 1, y: 0 }}
-					transition={{ duration: 0.8 }}
-					viewport={{ once: true }}
-				>
-					<h2 className='text-4xl md:text-5xl font-serif text-text-main mb-4'>
-						RSVP
-					</h2>
-					<p className='text-text-main/75 text-lg'>
-						Potwierdź swoją obecność do 18 lipca
-					</p>
-					<div className='w-16 h-1 bg-accent-gold mx-auto rounded-full mt-4' />
-				</motion.div>
+				<SectionHeading
+					eyebrow='Potwierdzenie obecności'
+					title='RSVP'
+					subtitle='Potwierdź swoją obecność do 18 lipca'
+					className='mb-12'
+				/>
 
-				{/* Card */}
+				{/* Karta jak zaproszenie */}
 				<motion.div
-					className='bg-primary-bg rounded-3xl shadow-elegant p-8 md:p-12'
+					className='relative bg-white rounded-2xl shadow-card p-8 md:p-12'
 					initial={{ opacity: 0, y: 20 }}
 					whileInView={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.6 }}
 					viewport={{ once: true }}
 				>
+					<span
+						className='pointer-events-none absolute inset-2 rounded-xl border border-accent-gold/20'
+						aria-hidden='true'
+					/>
+
 					<AnimatePresence mode='wait'>
-						{/* Step 1: Form */}
+						{/* Krok 1: Formularz */}
 						{step === 1 && (
 							<motion.div
 								key='step1'
@@ -102,13 +100,14 @@ export default function RSVP() {
 								animate={{ opacity: 1, x: 0 }}
 								exit={{ opacity: 0, x: -20 }}
 								transition={{ duration: 0.4 }}
+								className='relative'
 							>
-								<h3 className='text-2xl font-serif text-text-main mb-8'>
+								<h3 className='text-2xl font-serif font-medium text-text-main mb-8 text-center'>
 									Wyślij potwierdzenie
 								</h3>
 
 								<form onSubmit={handleSubmit} className='space-y-6'>
-									{/* Name fields */}
+									{/* Imię i nazwisko */}
 									<div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
 										<div>
 											<label className={labelClass}>Imię *</label>
@@ -148,22 +147,26 @@ export default function RSVP() {
 										</div>
 									</div>
 
-									{/* Attendance */}
+									{/* Obecność */}
 									<div>
 										<label className={labelClass}>
 											Czy będziesz w stanie wziąć udział w naszym weselu? *
 										</label>
 										<div className='space-y-3'>
 											{[
-												{ value: 'yes', label: '✔ Tak, będę uczestniczyć' },
+												{ value: 'yes', label: 'Tak, będę uczestniczyć' },
 												{
 													value: 'no',
-													label: '✗ Niestety nie będę mógł/mogła przybyć',
+													label: 'Niestety nie będę mógł/mogła przybyć',
 												},
 											].map((option) => (
 												<label
 													key={option.value}
-													className='flex items-center p-4 border-2 border-accent-green/30 rounded-xl cursor-pointer hover:bg-accent-green/5 transition-all group'
+													className={`flex items-center p-4 border rounded-xl cursor-pointer transition-all ${
+														attending === option.value
+															? 'border-accent-gold bg-accent-gold/5'
+															: 'border-accent-green/20 hover:border-accent-green/50'
+													}`}
 												>
 													<input
 														type='radio'
@@ -174,9 +177,9 @@ export default function RSVP() {
 															setAttending(e.target.value);
 															setErrors({ ...errors, attending: '' });
 														}}
-														className='w-5 h-5 accent-accent-green cursor-pointer'
+														className='w-5 h-5 accent-accent-green cursor-pointer text-accent-green focus:ring-accent-gold'
 													/>
-													<span className='ml-3 text-text-main font-medium group-hover:text-accent-green transition-colors'>
+													<span className='ml-3 text-text-main font-medium'>
 														{option.label}
 													</span>
 												</label>
@@ -189,36 +192,38 @@ export default function RSVP() {
 										)}
 									</div>
 
-									{/* Companions counter */}
+									{/* Licznik osób towarzyszących */}
 									<div>
 										<label className={labelClass}>
 											Czy potwierdzasz więcej osób?
 										</label>
-										<div className='flex items-center gap-4'>
+										<div className='flex items-center gap-5'>
 											<button
 												type='button'
 												onClick={handleRemoveCompanion}
 												disabled={companions.length === 0}
-												className='px-4 py-2 bg-accent-green/20 hover:bg-accent-green/30 text-accent-green rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed'
+												aria-label='Usuń osobę towarzyszącą'
+												className='w-11 h-11 rounded-full border border-accent-green/30 text-accent-green text-xl font-medium hover:border-accent-green hover:bg-accent-green hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-accent-green disabled:hover:border-accent-green/30'
 											>
 												−
 											</button>
-											<span className='text-3xl font-bold text-accent-green min-w-[3rem] text-center'>
+											<span className='text-3xl font-serif font-medium text-accent-green min-w-[3rem] text-center tabular-nums'>
 												{companions.length}
 											</span>
 											<button
 												type='button'
 												onClick={handleAddCompanion}
-												className='px-4 py-2 bg-accent-green/20 hover:bg-accent-green/30 text-accent-green rounded-lg font-semibold transition-all'
+												aria-label='Dodaj osobę towarzyszącą'
+												className='w-11 h-11 rounded-full border border-accent-green/30 text-accent-green text-xl font-medium hover:border-accent-green hover:bg-accent-green hover:text-white transition-all'
 											>
 												+
 											</button>
 										</div>
 									</div>
 
-									{/* Companion name fields */}
+									{/* Dane osób towarzyszących */}
 									{companions.length > 0 && (
-										<div className='border-2 border-accent-green/20 rounded-xl p-6 bg-accent-green/5 space-y-4'>
+										<div className='border border-accent-gold/30 rounded-xl p-6 bg-primary-bg/50 space-y-4'>
 											<p className='text-sm font-semibold text-text-main'>
 												Podaj imiona i nazwiska osób towarzyszących:
 											</p>
@@ -231,7 +236,7 @@ export default function RSVP() {
 														exit={{ opacity: 0, y: -10 }}
 														transition={{ duration: 0.15 }}
 													>
-														<p className='text-sm text-text-main mb-2'>
+														<p className='text-xs uppercase tracking-widest font-semibold text-text-main/60 mb-2'>
 															Osoba {index + 1}
 														</p>
 														<div className='grid md:grid-cols-2 grid-cols-1 gap-3'>
@@ -246,7 +251,7 @@ export default function RSVP() {
 																	)
 																}
 																placeholder='Imię'
-																className='flex-1 px-3 py-2 border-2 border-accent-green/20 rounded-lg bg-white text-sm focus:outline-none focus:border-accent-green focus:ring-2 focus:ring-accent-gold/30 transition-all'
+																className='flex-1 px-3 py-2.5 border border-accent-green/20 rounded-lg bg-white text-sm focus:outline-none focus:border-accent-gold focus:ring-2 focus:ring-accent-gold/25 transition-all placeholder:text-text-main/40 placeholder:font-light'
 															/>
 															<input
 																type='text'
@@ -259,7 +264,7 @@ export default function RSVP() {
 																	)
 																}
 																placeholder='Nazwisko'
-																className='flex-1 px-3 py-2 border-2 border-accent-green/20 rounded-lg bg-white text-sm focus:outline-none focus:border-accent-green focus:ring-2 focus:ring-accent-gold/30 transition-all'
+																className='flex-1 px-3 py-2.5 border border-accent-green/20 rounded-lg bg-white text-sm focus:outline-none focus:border-accent-gold focus:ring-2 focus:ring-accent-gold/25 transition-all placeholder:text-text-main/40 placeholder:font-light'
 															/>
 														</div>
 													</motion.div>
@@ -268,18 +273,18 @@ export default function RSVP() {
 										</div>
 									)}
 
-									{/* Submit error */}
+									{/* Błąd wysyłki */}
 									{errors.submit && (
 										<p className='text-red-500 text-sm text-center'>
 											{errors.submit}
 										</p>
 									)}
 
-									{/* Submit button */}
+									{/* Przycisk wysyłki */}
 									<button
 										type='submit'
 										disabled={isLoading}
-										className='w-full px-6 py-3 bg-accent-green hover:bg-accent-green/90 disabled:bg-accent-green/50 text-white rounded-full font-semibold hover:shadow-elegant hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2'
+										className='btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed'
 									>
 										{isLoading ? (
 											<>
@@ -305,14 +310,14 @@ export default function RSVP() {
 												Wysyłanie...
 											</>
 										) : (
-											'Wyślij Potwierdzenie'
+											'Wyślij potwierdzenie'
 										)}
 									</button>
 								</form>
 							</motion.div>
 						)}
 
-						{/* Step 2: Success */}
+						{/* Krok 2: Podziękowanie */}
 						{step === 2 && (
 							<motion.div
 								key='step2'
@@ -320,25 +325,41 @@ export default function RSVP() {
 								animate={{ opacity: 1, scale: 1 }}
 								exit={{ opacity: 0, scale: 0.95 }}
 								transition={{ duration: 0.5 }}
-								className='text-center py-8'
+								className='relative text-center py-8'
 							>
 								<motion.div
-									className='text-6xl mb-6'
-									animate={{ scale: [1, 1.1, 1] }}
-									transition={{ duration: 0.5, delay: 0.2 }}
-								></motion.div>
-								<h3 className='text-3xl md:text-4xl font-serif text-text-main mb-4'>
+									className='mx-auto mb-6 w-16 h-16 rounded-full border border-accent-gold/50 flex items-center justify-center'
+									initial={{ scale: 0.6, opacity: 0 }}
+									animate={{ scale: 1, opacity: 1 }}
+									transition={{ duration: 0.5, delay: 0.15 }}
+								>
+									<svg
+										className='w-7 h-7 text-accent-gold'
+										fill='none'
+										stroke='currentColor'
+										strokeWidth={1.5}
+										viewBox='0 0 24 24'
+									>
+										<path
+											strokeLinecap='round'
+											strokeLinejoin='round'
+											d='M4.5 12.75l6 6 9-13.5'
+										/>
+									</svg>
+								</motion.div>
+								<h3 className='text-3xl md:text-4xl font-serif font-medium text-text-main mb-4'>
 									Dziękujemy!
 								</h3>
-								<div className='bg-accent-green/10 rounded-2xl p-6 mb-8 border-l-4 border-accent-green'>
+								<Ornament className='mb-8' />
+								<div className='bg-primary-bg/60 rounded-xl border border-accent-gold/25 p-6'>
 									<p className='text-text-main font-semibold mb-2'>
 										Ważne informacje:
 									</p>
-									<p className='text-sm text-text-main/75'>
+									<p className='text-sm font-light text-text-main/75'>
 										Możesz zmienić odpowiedź pisząc do nas na{' '}
 										<a
-											href='mailto:kontakt@naszslub.pl'
-											className='underline hover:text-accent-green transition-colors'
+											href='mailto:bartek011229@gmail.com'
+											className='underline decoration-accent-gold/60 underline-offset-2 hover:text-accent-green transition-colors'
 										>
 											bartek011229@gmail.com
 										</a>

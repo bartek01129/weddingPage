@@ -1,19 +1,24 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&family=Montserrat:wght@400;500;600;700&family=Lato:wght@300;400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700&family=Montserrat:wght@300;400;500;600;700&family=Lato:wght@300;400;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer components {
 	.btn-primary {
-		@apply px-6 py-3 bg-accent-green text-white rounded-full font-semibold hover:shadow-elegant hover:scale-105 transition-all;
+		@apply inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-accent-green text-white rounded-full font-sans font-semibold text-sm uppercase tracking-elegant hover:bg-info-green hover:shadow-elegant transition-all duration-300;
 	}
 
 	.btn-secondary {
-		@apply px-6 py-3 border-2 border-accent-green text-text-main rounded-full font-semibold hover:bg-accent-green hover:text-white transition-all;
+		@apply inline-flex items-center justify-center gap-2 px-8 py-3.5 border border-accent-green/40 text-text-main rounded-full font-sans font-semibold text-sm uppercase tracking-elegant hover:border-accent-green hover:bg-accent-green hover:text-white transition-all duration-300;
 	}
 
 	.card-hover {
 		@apply transition-all duration-300 hover:shadow-elegant;
+	}
+
+	/* Małe, rozstrzelone kapitaliki nad nagłówkami sekcji */
+	.eyebrow {
+		@apply font-sans text-xs font-semibold uppercase tracking-wider2 text-accent-gold;
 	}
 
 	.gradient-text {
@@ -37,7 +42,7 @@ body {
 	background-color: #f3f0e7;
 	color: #3a4b40;
 	font-family: 'Montserrat', sans-serif;
-	line-height: 1.6;
+	line-height: 1.7;
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
 }
@@ -72,7 +77,23 @@ select {
 	color: #ffffff;
 }
 
-button:focus,
-button:focus-visible {
-	outline: 4px auto -webkit-focus-ring-color;
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+	outline: 2px solid #c5a059;
+	outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto;
+	}
+
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
 }

@@ -48,17 +48,25 @@ export default function App() {
 									<Countdown />
 									<Welcome />
 
-									<section className='py-12 bg-white/30 backdrop-blur-sm text-center'>
-										<div className='max-w-4xl mx-auto px-4'>
-											<h3 className='text-2xl font-serif font-bold text-accent-green mb-6'>
-												Podziel się z nami swoimi chwilami!
-											</h3>
-											<Link
-												to='/galeria'
-												className='inline-block bg-accent-green text-white px-10 py-4 rounded-full font-bold shadow-lg hover:scale-105 transition-transform'
-											>
-												Otwórz Galerię Zdjęć
-											</Link>
+									<section className='py-16 px-4 bg-primary-bg'>
+										<div className='max-w-2xl mx-auto'>
+											<div className='relative rounded-2xl border border-accent-gold/30 bg-white/60 backdrop-blur-sm shadow-card p-10 md:p-12 text-center'>
+												<span
+													className='pointer-events-none absolute inset-2 rounded-xl border border-accent-gold/20'
+													aria-hidden='true'
+												/>
+												<p className='eyebrow mb-4'>Wspólna galeria</p>
+												<h3 className='text-2xl md:text-3xl font-serif font-medium text-text-main mb-4'>
+													Podziel się z nami swoimi chwilami!
+												</h3>
+												<p className='text-sm md:text-base font-light text-text-main/75 mb-8 max-w-md mx-auto'>
+													Wgrajcie zdjęcia z naszego wielkiego dnia — razem
+													stworzymy wspólny album pełen wspomnień.
+												</p>
+												<Link to='/galeria' className='btn-primary'>
+													Otwórz galerię zdjęć
+												</Link>
+											</div>
 										</div>
 									</section>
 									<Agenda />
@@ -114,8 +122,9 @@ function ScrollToTopButton() {
 	return (
 		<button
 			onClick={scrollToTop}
-			className='fixed bottom-8 right-8 p-3 bg-accent-green text-white rounded-full shadow-elegant hover:shadow-soft hover:scale-110 transition-all z-50'
+			className='fixed bottom-8 right-8 p-3 bg-accent-green text-white rounded-full border border-white/25 shadow-elegant hover:bg-info-green transition-all z-50'
 			title='Powrót do góry'
+			aria-label='Powrót do góry'
 		>
 			<svg
 				className='w-6 h-6'

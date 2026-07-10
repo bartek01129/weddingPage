@@ -1,18 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-
-const cardVariants = {
-	hidden: { opacity: 0, y: 30 },
-	visible: (i) => ({
-		opacity: 1,
-		y: 0,
-		transition: {
-			delay: i * 0.2,
-			duration: 0.6,
-			ease: 'easeOut',
-		},
-	}),
-};
+import SectionHeading from './ui/SectionHeading';
 
 const infoCards = [
 	{
@@ -69,43 +57,57 @@ const infoCards = [
 
 export default function Agenda() {
 	return (
-		<section id='agenda' className='py-20 px-4 bg-accent-green'>
+		<section id='agenda' className='py-20 md:py-24 px-4 bg-accent-green'>
 			<div className='max-w-7xl mx-auto'>
-				<motion.div
-					className='text-center mb-16'
-					initial={{ opacity: 0, y: -20 }}
-					whileInView={{ opacity: 1, y: 0 }}
-					transition={{ duration: 0.4 }}
-					viewport={{ once: true }}
-				>
-					<h2 className='text-4xl md:text-5xl font-serif text-white mb-4'>
-						Przebieg
-					</h2>
-					<div className='w-16 h-1 bg-accent-gold mx-auto rounded-full' />
-				</motion.div>
+				<SectionHeading
+					eyebrow='Sobota · 22 sierpnia 2026'
+					title='Przebieg dnia'
+					tone='light'
+					className='mb-16 md:mb-20'
+				/>
 
-				<div className='grid grid-cols-1 md:grid-cols-5 gap-8'>
-					{infoCards.map((card, i) => (
-						<motion.div
-							key={card.id}
-							custom={i}
-							variants={cardVariants}
-							initial='hidden'
-							whileInView='visible'
-							transition={{ duration: 0.1 }}
-							viewport={{ once: true }}
-							className='bg-white/20 backdrop-blur-sm rounded-xl p-6 shadow-soft hover:shadow-elegant transition-shadow flex flex-col'
-						>
-							<h3 className='text-lg font-serif font-bold text-white mb-3 flex-1'>
-								{card.title}
-							</h3>
-							{card.time && (
-								<p className='text-accent-gold font-semibold text-base mt-auto'>
-									{card.time}
-								</p>
-							)}
-						</motion.div>
-					))}
+				{/* Oś czasu */}
+				<div className='relative max-w-3xl mx-auto'>
+					<span
+						className='absolute left-[5px] md:left-1/2 md:-translate-x-1/2 top-2 bottom-2 w-px bg-white/20'
+						aria-hidden='true'
+					/>
+					<ol className='space-y-10 md:space-y-12'>
+						{infoCards.map((card, i) => {
+							const isLeft = i % 2 === 0;
+							return (
+								<motion.li
+									key={card.id}
+									className='relative pl-10 md:pl-0 md:grid md:grid-cols-2 md:gap-20 md:items-center'
+									initial={{ opacity: 0, y: 24 }}
+									whileInView={{ opacity: 1, y: 0 }}
+									transition={{ duration: 0.6, ease: 'easeOut' }}
+									viewport={{ once: true, margin: '-40px' }}
+								>
+									{/* Węzeł na osi */}
+									<span
+										className='absolute left-0 top-2 md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-[11px] h-[11px] rotate-45 bg-accent-gold ring-4 ring-accent-green'
+										aria-hidden='true'
+									/>
+
+									<div
+										className={
+											isLeft
+												? 'md:text-right'
+												: 'md:col-start-2 md:text-left'
+										}
+									>
+										<p className='font-serif italic text-accent-gold text-2xl md:text-3xl leading-none mb-2'>
+											{card.time}
+										</p>
+										<h3 className='font-serif font-medium text-white text-xl md:text-2xl leading-snug'>
+											{card.title}
+										</h3>
+									</div>
+								</motion.li>
+							);
+						})}
+					</ol>
 				</div>
 			</div>
 		</section>

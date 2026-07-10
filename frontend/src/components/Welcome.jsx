@@ -1,26 +1,25 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import SectionHeading from './ui/SectionHeading';
 
 export default function Welcome() {
 	return (
-		<section id='welcome' className='py-12 md:py-14 px-4 bg-primary-bg'>
+		<section id='welcome' className='py-16 md:py-20 px-4 bg-primary-bg'>
 			<div className='max-w-4xl mx-auto'>
-				<motion.div
-					initial={{ opacity: 0, y: 10 }}
-					whileInView={{ opacity: 1, y: 0 }}
-					transition={{ duration: 0.5 }}
+				<SectionHeading
+					eyebrow='Kilka słów od nas'
+					title='Drodzy Goście!'
+					subtitle='Tu znajdziecie najważniejsze informacje odnośnie ślubu — daty, lokalizacje, mapki, a także potwierdzicie swoją obecność na naszej uroczystości.'
+				/>
+				<motion.p
+					initial={{ opacity: 0 }}
+					whileInView={{ opacity: 1 }}
+					transition={{ duration: 0.8, delay: 0.2 }}
 					viewport={{ once: true }}
-					className='text-center'
+					className='mt-6 text-center font-serif italic text-xl md:text-2xl text-accent-green'
 				>
-					<h2 className='text-2xl md:text-3xl font-serif font-bold text-accent-green mb-4'>
-						Drodzy goście!
-					</h2>
-					<p className='text-base md:text-lg text-text-main/80 leading-relaxed max-w-2xl mx-auto'>
-						Tu znajdziecie najważniejsze informacje odnośnie ślubu - daty,
-						lokalizacje, mapki, a także potwierdzicie swoją obecność na naszej
-						uroczystości. Już nie możemy doczekać się spotkania z Wami!
-					</p>
-				</motion.div>
+					Już nie możemy doczekać się spotkania z Wami!
+				</motion.p>
 			</div>
 		</section>
 	);

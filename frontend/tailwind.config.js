@@ -35,6 +35,11 @@ export default {
 				soft: '0 10px 30px rgba(58, 75, 64, 0.08)',
 				softer: '0 4px 15px rgba(58, 75, 64, 0.06)',
 				elegant: '0 15px 40px rgba(58, 75, 64, 0.12)',
+				card: '0 1px 2px rgba(58, 75, 64, 0.05), 0 20px 50px -12px rgba(58, 75, 64, 0.14)',
+			},
+			letterSpacing: {
+				elegant: '0.25em',
+				wider2: '0.35em',
 			},
 			spacing: {
 				18: '4.5rem',

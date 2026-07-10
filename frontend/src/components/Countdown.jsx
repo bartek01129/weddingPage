@@ -2,14 +2,21 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 
 const TimeUnit = ({ value, label }) => (
-	<div className='flex flex-col items-center'>
-		<div className='text-2xl md:text-3xl font-serif font-bold text-accent-green'>
+	<div className='flex flex-col items-center min-w-[4.5rem]'>
+		<div className='text-4xl md:text-5xl font-serif font-medium text-accent-green tabular-nums'>
 			{String(value).padStart(2, '0')}
 		</div>
-		<div className='text-xs md:text-sm text-accent-green/60 uppercase tracking-widest font-semibold'>
+		<div className='mt-2 text-xs text-accent-gold uppercase tracking-elegant font-semibold'>
 			{label}
 		</div>
 	</div>
+);
+
+const Separator = () => (
+	<span
+		className='hidden sm:block w-px h-12 bg-accent-green/15 self-center'
+		aria-hidden='true'
+	/>
 );
 
 export default function Countdown() {
@@ -44,20 +51,24 @@ export default function Countdown() {
 	return (
 		<section
 			id='countdown'
-			className='py-8 md:py-10 px-4 bg-primary-bg border-b border-accent-green/10'
+			className='py-12 md:py-16 px-4 bg-primary-bg border-b border-accent-green/10'
 		>
 			<div className='max-w-4xl mx-auto'>
 				<motion.div
-					initial={{ opacity: 0 }}
-					whileInView={{ opacity: 1 }}
-					transition={{ duration: 0.4 }}
+					initial={{ opacity: 0, y: 12 }}
+					whileInView={{ opacity: 1, y: 0 }}
+					transition={{ duration: 0.6 }}
 					viewport={{ once: true }}
 					className='text-center'
 				>
-					<div className='flex justify-center gap-3 md:gap-6 flex-wrap'>
+					<p className='eyebrow mb-8'>Do naszego wielkiego dnia pozostało</p>
+					<div className='flex justify-center gap-5 md:gap-10 flex-wrap'>
 						<TimeUnit value={timeLeft.days} label='Dni' />
+						<Separator />
 						<TimeUnit value={timeLeft.hours} label='Godzin' />
+						<Separator />
 						<TimeUnit value={timeLeft.minutes} label='Minut' />
+						<Separator />
 						<TimeUnit value={timeLeft.seconds} label='Sekund' />
 					</div>
 				</motion.div>

@@ -89,7 +89,7 @@ export default function PhotoBooth() {
 				<div className='flex justify-start mb-8'>
 					<button
 						onClick={() => navigate('/')}
-						className='flex items-center gap-2 text-accent-green font-semibold hover:opacity-70 transition-opacity'
+						className='flex items-center gap-2 text-accent-green text-xs font-semibold uppercase tracking-elegant hover:text-accent-gold transition-colors'
 					>
 						<svg
 							className='w-5 h-5'
@@ -108,22 +108,32 @@ export default function PhotoBooth() {
 					</button>
 				</div>
 
-				<div className='text-center mb-12'>
-					<motion.h2
-						initial={{ opacity: 0, y: -20 }}
-						animate={{ opacity: 1, y: 0 }}
-						className='text-4xl md:text-5xl font-serif font-bold text-accent-green mb-4'
-					>
+				<motion.div
+					className='text-center mb-12'
+					initial={{ opacity: 0, y: 16 }}
+					animate={{ opacity: 1, y: 0 }}
+					transition={{ duration: 0.7, ease: 'easeOut' }}
+				>
+					<p className='eyebrow mb-4'>Wspólne wspomnienia</p>
+					<h2 className='text-4xl md:text-5xl font-serif font-medium text-text-main mb-6'>
 						Galeria Weselna
-					</motion.h2>
-					<p className='text-text-main/70 italic'>
+					</h2>
+					<div
+						className='flex items-center justify-center gap-3 mb-5'
+						aria-hidden='true'
+					>
+						<span className='h-px w-14 bg-gradient-to-r from-transparent to-accent-gold/80' />
+						<span className='block w-1.5 h-1.5 rotate-45 bg-accent-gold' />
+						<span className='h-px w-14 bg-gradient-to-r from-accent-gold/80 to-transparent' />
+					</div>
+					<p className='font-serif italic text-xl text-accent-green/85'>
 						Uwiecznijmy te chwile razem!
 					</p>
-				</div>
+				</motion.div>
 
 				{/* Sekcja Aparatu*/}
 				<div className='sticky top-4 z-30 mb-12 flex justify-center'>
-					<div className='bg-white/90 backdrop-blur-md p-4 md:p-6 rounded-3xl shadow-elegant border border-accent-green/10 w-full max-w-md'>
+					<div className='bg-white/90 backdrop-blur-md p-4 md:p-6 rounded-2xl shadow-card border border-accent-gold/30 w-full max-w-md'>
 						<div className='flex flex-row gap-3 justify-center'>
 							{/* INPUT DLA APARATU */}
 							<input
@@ -137,7 +147,7 @@ export default function PhotoBooth() {
 							/>
 							<label
 								htmlFor='camera-input'
-								className={`flex-1 flex flex-col items-center gap-2 px-4 py-4 bg-accent-green text-white rounded-2xl font-bold shadow-lg cursor-pointer hover:scale-[1.02] active:scale-95 transition-all ${
+								className={`flex-1 flex flex-col items-center gap-2 px-4 py-4 bg-accent-green text-white rounded-xl font-semibold shadow-soft cursor-pointer hover:bg-info-green active:scale-95 transition-all ${
 									uploading ? 'opacity-50 cursor-not-allowed' : ''
 								}`}
 							>
@@ -174,7 +184,7 @@ export default function PhotoBooth() {
 							/>
 							<label
 								htmlFor='gallery-input'
-								className={`flex-1 flex flex-col items-center gap-2 px-4 py-4 bg-white text-accent-green border-2 border-accent-green rounded-2xl font-bold shadow-md cursor-pointer hover:scale-[1.02] active:scale-95 transition-all ${
+								className={`flex-1 flex flex-col items-center gap-2 px-4 py-4 bg-white text-accent-green border border-accent-green/40 rounded-xl font-semibold shadow-softer cursor-pointer hover:border-accent-green hover:bg-accent-green/5 active:scale-95 transition-all ${
 									uploading ? 'opacity-50 cursor-not-allowed' : ''
 								}`}
 							>
