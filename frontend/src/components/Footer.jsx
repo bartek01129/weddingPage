@@ -34,10 +34,6 @@ export default function Footer() {
 							<span className='block w-1.5 h-1.5 rotate-45 bg-accent-gold' />
 							<span className='h-px w-14 bg-gradient-to-r from-accent-gold/70 to-transparent' />
 						</div>
-						<p className='text-white/75 text-sm font-light leading-relaxed'>
-							Zapraszamy Cię do udziału w naszym wielkim dniu. Twoja obecność
-							oznacza dla nas całe szczęście.
-						</p>
 					</motion.div>
 				</div>
 

@@ -45,7 +45,7 @@ export default function Gifts() {
 				<p className='text-base md:text-lg text-text-main/70 leading-relaxed max-w-2xl mx-auto font-light'>
 					Największym prezentem będzie Wasza obecność w tym wyjątkowym dniu.
 					Jeśli jednak chcielibyście obdarować nas upominkiem, zamiast kwiatów i
-					prezentów prosimy o cegiełkę na spełnienie naszego marzenia.
+					prezentów prosimy o cegiełkę na wykończenie naszego domu.
 				</p>
 			</motion.div>
 		</section>

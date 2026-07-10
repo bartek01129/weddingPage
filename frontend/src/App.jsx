@@ -55,6 +55,24 @@ export default function App() {
 													className='pointer-events-none absolute inset-2 rounded-xl border border-accent-gold/20'
 													aria-hidden='true'
 												/>
+												{/* Ikona aparatu */}
+												<div className='flex justify-center mb-6 text-accent-gold'>
+													<svg
+														width='36'
+														height='36'
+														viewBox='0 0 24 24'
+														fill='none'
+														stroke='currentColor'
+														strokeWidth={1.3}
+														strokeLinecap='round'
+														strokeLinejoin='round'
+														aria-hidden='true'
+													>
+														<path d='M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z' />
+														<circle cx='12' cy='13' r='3.5' />
+														<path d='M17.5 9.5h.01' />
+													</svg>
+												</div>
 												<p className='eyebrow mb-4'>Wspólna galeria</p>
 												<h3 className='text-2xl md:text-3xl font-serif font-medium text-text-main mb-4'>
 													Podziel się z nami swoimi chwilami!
