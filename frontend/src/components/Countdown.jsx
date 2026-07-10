@@ -61,7 +61,7 @@ export default function Countdown() {
 					viewport={{ once: true }}
 					className='text-center'
 				>
-					<p className='eyebrow mb-8'>Do naszego wielkiego dnia pozostało</p>
+					<p className='eyebrow mb-8'>Do naszego „Tak” pozostało </p>
 					<div className='flex justify-center gap-5 md:gap-10 flex-wrap'>
 						<TimeUnit value={timeLeft.days} label='Dni' />
 						<Separator />

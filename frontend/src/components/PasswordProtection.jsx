@@ -76,7 +76,7 @@ export default function PasswordProtection({ onSuccess }) {
 				/>
 
 				<div className='relative text-center mb-8'>
-					<p className='eyebrow mb-4'>Prywatne zaproszenie</p>
+					<p className='eyebrow mb-4'>Prywatna strona ślubna</p>
 					<h1 className='text-3xl md:text-4xl font-serif font-medium text-text-main mb-2'>
 						Paulina{' '}
 						<span className='font-serif italic font-normal text-accent-gold'>
@@ -161,10 +161,6 @@ export default function PasswordProtection({ onSuccess }) {
 						)}
 					</motion.button>
 				</form>
-
-				<p className='relative text-center text-xs font-light text-text-main/50 mt-6'>
-					Hasło znajdziesz w swoim zaproszeniu
-				</p>
 			</motion.div>
 		</motion.div>
 	);

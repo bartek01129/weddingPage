@@ -1,39 +1,12 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 
-const navLinks = [
-	{ name: 'Strona główna', href: '#hero' },
-	{ name: 'Potwierdzenie przybycia', href: '#rsvp' },
-	{ name: 'Lokalizacja', href: '#map' },
-];
-
 export default function Footer() {
 	const currentYear = new Date().getFullYear();
 
 	return (
 		<footer className='bg-accent-green text-white py-16 md:py-20 px-4'>
 			<div className='max-w-6xl mx-auto'>
-				{/* Nawigacja */}
-				<motion.div
-					className='text-center mb-14 pb-10 border-b border-white/10'
-					initial={{ opacity: 0 }}
-					whileInView={{ opacity: 1 }}
-					transition={{ duration: 0.6 }}
-					viewport={{ once: true }}
-				>
-					<div className='flex flex-wrap justify-center gap-6 md:gap-10'>
-						{navLinks.map((link) => (
-							<a
-								key={link.href}
-								href={link.href}
-								className='text-white/70 hover:text-accent-gold transition-colors font-sans text-xs font-semibold uppercase tracking-elegant'
-							>
-								{link.name}
-							</a>
-						))}
-					</div>
-				</motion.div>
-
 				{/* Monogram */}
 				<div className='flex justify-center mb-14'>
 					<motion.div
@@ -84,14 +57,6 @@ export default function Footer() {
 					<p className='text-xs text-white/50 font-light'>
 						© {currentYear} Paulina & Bartek. All rights reserved.
 					</p>
-					<div className='mt-6'>
-						<a
-							href='#hero'
-							className='inline-block text-xs font-semibold uppercase tracking-elegant text-white/60 hover:text-accent-gold transition-colors'
-						>
-							Powrót do góry ↑
-						</a>
-					</div>
 				</motion.div>
 			</div>
 		</footer>
