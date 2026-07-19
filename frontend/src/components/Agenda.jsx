@@ -61,7 +61,7 @@ export default function Agenda() {
 			<div className='max-w-7xl mx-auto'>
 				<SectionHeading
 					eyebrow='Sobota · 22 sierpnia 2026'
-					title='Przebieg dnia'
+					title='Orientacyjny przebieg dnia'
 					tone='light'
 					className='mb-16 md:mb-20'
 				/>

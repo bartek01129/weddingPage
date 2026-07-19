@@ -143,15 +143,20 @@ export default function Songs() {
 	}, [fetchSongs]);
 
 	const handleUpvote = async (id) => {
-		if (upvotedIds.has(id)) return;
+		const hasVoted = upvotedIds.has(id);
+		const endpoint = hasVoted ? 'downvote' : 'upvote';
 
 		try {
-			const res = await fetch(`${API_URL}/${id}/upvote`, { method: 'POST' });
+			const res = await fetch(`${API_URL}/${id}/${endpoint}`, {
+				method: 'POST',
+			});
 			const data = await res.json();
 
 			if (res.status === 409) {
-				// Już głosował wg serwera — zaktualizuj lokalny stan
-				const newSet = new Set([...upvotedIds, id]);
+				// Stan lokalny rozjechał się z serwerem — zsynchronizuj
+				const newSet = new Set(upvotedIds);
+				if (hasVoted) newSet.delete(id);
+				else newSet.add(id);
 				setUpvotedIds(newSet);
 				sessionStorage.setItem('upvotedSongs', JSON.stringify([...newSet]));
 				return;
@@ -164,7 +169,9 @@ export default function Songs() {
 					.map((s) => (s.id === id ? data : s))
 					.sort((a, b) => b.votes - a.votes),
 			);
-			const newSet = new Set([...upvotedIds, id]);
+			const newSet = new Set(upvotedIds);
+			if (hasVoted) newSet.delete(id);
+			else newSet.add(id);
 			setUpvotedIds(newSet);
 			sessionStorage.setItem('upvotedSongs', JSON.stringify([...newSet]));
 		} catch {
@@ -396,7 +403,9 @@ export default function Songs() {
 				) : (
 					<motion.div
 						className={`space-y-3 ${
-							songs.length > 10 ? 'max-h-[880px] overflow-y-auto pr-2' : ''
+							songs.length > 10
+								? 'md:max-h-[880px] md:overflow-y-auto md:overscroll-contain md:pr-2'
+								: ''
 						}`}
 					>
 						<AnimatePresence>
@@ -460,10 +469,14 @@ export default function Songs() {
 									{/* Upvote */}
 									<button
 										onClick={() => handleUpvote(song.id)}
-										disabled={upvotedIds.has(song.id)}
-										className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-semibold border transition-all ${
+										title={
 											upvotedIds.has(song.id)
-												? 'border-accent-gold/40 bg-accent-gold/10 text-accent-gold cursor-default'
+												? 'Kliknij, aby cofnąć głos'
+												: 'Zagłosuj'
+										}
+										className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-semibold border transition-all group ${
+											upvotedIds.has(song.id)
+												? 'border-accent-gold/40 bg-accent-gold/10 text-accent-gold hover:bg-accent-gold/20'
 												: 'border-accent-green/25 bg-white text-accent-green hover:bg-accent-green hover:border-accent-green hover:text-white'
 										}`}
 									>
