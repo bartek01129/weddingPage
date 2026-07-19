@@ -90,7 +90,7 @@ export default function App() {
 									<Agenda />
 									<Info />
 									<Map />
-									<RSVP />
+									{/* <RSVP /> */}
 									<Gifts />
 									<Contact />
 									<Songs />
