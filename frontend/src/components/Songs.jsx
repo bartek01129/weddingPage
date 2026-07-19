@@ -1,8 +1,50 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import SectionHeading from './ui/SectionHeading';
 
 const API_URL = '/api/songs';
+
+function getYouTubeId(link) {
+	if (!link) return null;
+	try {
+		const url = new URL(link);
+		let id = null;
+		if (url.hostname === 'youtu.be') {
+			id = url.pathname.split('/')[1];
+		} else if (
+			url.hostname === 'youtube.com' ||
+			url.hostname.endsWith('.youtube.com')
+		) {
+			if (url.pathname === '/watch') {
+				id = url.searchParams.get('v');
+			} else {
+				const match = url.pathname.match(/^\/(embed|shorts|live)\/([^/]+)/);
+				if (match) id = match[2];
+			}
+		}
+		return id && /^[\w-]{11}$/.test(id) ? id : null;
+	} catch {
+		return null;
+	}
+}
+
+let ytApiPromise = null;
+function loadYouTubeApi() {
+	if (window.YT && window.YT.Player) return Promise.resolve(window.YT);
+	if (!ytApiPromise) {
+		ytApiPromise = new Promise((resolve) => {
+			const prev = window.onYouTubeIframeAPIReady;
+			window.onYouTubeIframeAPIReady = () => {
+				prev?.();
+				resolve(window.YT);
+			};
+			const tag = document.createElement('script');
+			tag.src = 'https://www.youtube.com/iframe_api';
+			document.head.appendChild(tag);
+		});
+	}
+	return ytApiPromise;
+}
 
 export default function Songs() {
 	const [songs, setSongs] = useState([]);
@@ -24,6 +66,54 @@ export default function Songs() {
 
 	// Upvoted IDs stored in sessionStorage
 	const [upvotedIds, setUpvotedIds] = useState(new Set());
+
+	// YouTube playback
+	const [playingId, setPlayingId] = useState(null); // song id
+	const playerRef = useRef(null);
+
+	useEffect(() => {
+		return () => {
+			playerRef.current?.destroy?.();
+			playerRef.current = null;
+		};
+	}, []);
+
+	const handlePlayStop = async (song) => {
+		if (playingId === song.id) {
+			playerRef.current?.stopVideo?.();
+			setPlayingId(null);
+			return;
+		}
+
+		const videoId = getYouTubeId(song.link);
+		if (!videoId) return;
+
+		setPlayingId(song.id);
+
+		if (playerRef.current) {
+			playerRef.current.loadVideoById(videoId);
+			return;
+		}
+
+		const YT = await loadYouTubeApi();
+		if (playerRef.current) {
+			playerRef.current.loadVideoById(videoId);
+			return;
+		}
+		playerRef.current = new YT.Player('yt-audio-player', {
+			width: 0,
+			height: 0,
+			videoId,
+			playerVars: { autoplay: 1, playsinline: 1 },
+			events: {
+				onReady: (e) => e.target.playVideo(),
+				onStateChange: (e) => {
+					if (e.data === YT.PlayerState.ENDED) setPlayingId(null);
+				},
+				onError: () => setPlayingId(null),
+			},
+		});
+	};
 
 	const fetchSongs = useCallback(async () => {
 		try {
@@ -334,6 +424,39 @@ export default function Songs() {
 										</p>
 									</div>
 
+									{/* Play / Stop */}
+									{getYouTubeId(song.link) && (
+										<button
+											onClick={() => handlePlayStop(song)}
+											className={`flex items-center justify-center w-9 h-9 rounded-full border flex-shrink-0 transition-all ${
+												playingId === song.id
+													? 'border-accent-gold bg-accent-gold text-white'
+													: 'border-accent-gold/40 bg-white text-accent-gold hover:bg-accent-gold hover:text-white'
+											}`}
+											title={
+												playingId === song.id ? 'Zatrzymaj' : 'Odtwórz'
+											}
+										>
+											{playingId === song.id ? (
+												<svg
+													className='w-3.5 h-3.5'
+													fill='currentColor'
+													viewBox='0 0 24 24'
+												>
+													<rect x='6' y='6' width='12' height='12' rx='1' />
+												</svg>
+											) : (
+												<svg
+													className='w-4 h-4 ml-0.5'
+													fill='currentColor'
+													viewBox='0 0 24 24'
+												>
+													<path d='M8 5.14v13.72c0 .8.87 1.3 1.56.9l11.02-6.86c.65-.4.65-1.4 0-1.8L9.56 4.24A1.05 1.05 0 008 5.14z' />
+												</svg>
+											)}
+										</button>
+									)}
+
 									{/* Upvote */}
 									<button
 										onClick={() => handleUpvote(song.id)}
@@ -416,6 +539,11 @@ export default function Songs() {
 						</AnimatePresence>
 					</motion.div>
 				)}
+
+				{/* Hidden YouTube player (audio only) */}
+				<div className='absolute w-0 h-0 overflow-hidden' aria-hidden='true'>
+					<div id='yt-audio-player' />
+				</div>
 			</div>
 		</section>
 	);
