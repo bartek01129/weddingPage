@@ -304,7 +304,11 @@ export default function Songs() {
 						Brak utworów. Bądź pierwszy i zaproponuj coś!
 					</p>
 				) : (
-					<motion.div className='space-y-3'>
+					<motion.div
+						className={`space-y-3 ${
+							songs.length > 10 ? 'max-h-[880px] overflow-y-auto pr-2' : ''
+						}`}
+					>
 						<AnimatePresence>
 							{songs.map((song, index) => (
 								<motion.div
