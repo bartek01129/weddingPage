@@ -4,23 +4,32 @@ import SectionHeading from './ui/SectionHeading';
 
 const API_URL = '/api/songs';
 
-// Stały, anonimowy identyfikator urządzenia/przeglądarki (localStorage).
-// Głos jest przypisany do tego tokenu — działa na Android/iOS/Mac/Windows.
-function getVoterToken() {
+// Tożsamość głosującego: główne źródło to ciasteczko httpOnly ustawiane przez
+// serwer (leci automatycznie). W localStorage trzymamy kopię zapasową — pozwala
+// odzyskać swoje głosy, gdy ciasteczko przepadnie.
+const VOTER_TOKEN_KEY = 'voterToken';
+
+function readVoterToken() {
 	try {
-		let token = localStorage.getItem('voterToken');
-		if (!token) {
-			token =
-				typeof crypto !== 'undefined' && crypto.randomUUID
-					? crypto.randomUUID()
-					: `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
-			localStorage.setItem('voterToken', token);
-		}
-		return token;
+		return localStorage.getItem(VOTER_TOKEN_KEY) || '';
 	} catch {
-		// tryb prywatny bez dostępu do localStorage — token na czas sesji
-		return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+		return ''; // tryb prywatny — zostaje samo ciasteczko
 	}
+}
+
+function saveVoterToken(token) {
+	if (!token) return;
+	try {
+		localStorage.setItem(VOTER_TOKEN_KEY, token);
+	} catch {
+		// brak dostępu do localStorage — ignorujemy
+	}
+}
+
+// Nagłówek z zapasowym tokenem (serwer użyje go tylko przy braku ciasteczka)
+function voterHeaders() {
+	const token = readVoterToken();
+	return token ? { 'X-Voter-Token': token } : {};
 }
 
 function getYouTubeId(link) {
@@ -83,9 +92,6 @@ export default function Songs() {
 	const [deletingId, setDeletingId] = useState(null);
 	const [showAdminInput, setShowAdminInput] = useState(null); // song id
 
-	// Anonimowy token głosującego (trwały, per-urządzenie)
-	const voterToken = useRef(getVoterToken()).current;
-
 	// Upvoted IDs (źródłem prawdy jest serwer via /voted)
 	const [upvotedIds, setUpvotedIds] = useState(new Set());
 
@@ -142,11 +148,15 @@ export default function Songs() {
 			const [songsRes, votedRes] = await Promise.all([
 				fetch(API_URL),
 				fetch(`${API_URL}/voted`, {
-					headers: { 'X-Voter-Token': voterToken },
+					credentials: 'same-origin',
+					headers: voterHeaders(),
 				}),
 			]);
 
 			if (!songsRes.ok || !votedRes.ok) throw new Error();
+
+			// Serwer odsyła obowiązujący token — zapisz go jako kopię zapasową
+			saveVoterToken(votedRes.headers.get('X-Voter-Token'));
 
 			const [songsData, votedData] = await Promise.all([
 				songsRes.json(),
@@ -160,7 +170,7 @@ export default function Songs() {
 		} finally {
 			setIsLoading(false);
 		}
-	}, [voterToken]);
+	}, []);
 
 	useEffect(() => {
 		fetchSongs();
@@ -173,8 +183,10 @@ export default function Songs() {
 		try {
 			const res = await fetch(`${API_URL}/${id}/${endpoint}`, {
 				method: 'POST',
-				headers: { 'X-Voter-Token': voterToken },
+				credentials: 'same-origin',
+				headers: voterHeaders(),
 			});
+			saveVoterToken(res.headers.get('X-Voter-Token'));
 			const data = await res.json();
 
 			if (res.status === 409) {
