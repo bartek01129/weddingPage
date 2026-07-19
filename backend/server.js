@@ -231,6 +231,51 @@ app.post('/api/songs/:id/upvote', async (req, res) => {
 	}
 });
 
+app.post('/api/songs/:id/downvote', async (req, res) => {
+	const { id } = req.params;
+
+	const client = getClientInfo(req);
+	const ip = client.ip;
+	const userAgent = client.userAgent;
+
+	try {
+		const [existing] = await pool.execute('SELECT id FROM songs WHERE id = ?', [
+			id,
+		]);
+		if (existing.length === 0) {
+			return res.status(404).json({ error: 'Utwór nie istnieje.' });
+		}
+
+		// Sprawdź czy ten użytkownik oddał głos
+		const [alreadyVoted] = await pool.execute(
+			'SELECT id FROM upvotes WHERE song_id = ? AND ip = ? AND user_agent = ?',
+			[id, ip, userAgent.slice(0, 100)],
+		);
+
+		if (alreadyVoted.length === 0) {
+			return res
+				.status(409)
+				.json({ error: 'Nie oddałeś głosu na ten utwór.' });
+		}
+
+		// Usuń głos i zmniejsz licznik (nie schodząc poniżej zera)
+		await pool.execute(
+			'DELETE FROM upvotes WHERE song_id = ? AND ip = ? AND user_agent = ?',
+			[id, ip, userAgent.slice(0, 100)],
+		);
+		await pool.execute(
+			'UPDATE songs SET votes = GREATEST(votes - 1, 0) WHERE id = ?',
+			[id],
+		);
+
+		const [rows] = await pool.execute('SELECT * FROM songs WHERE id = ?', [id]);
+		res.json(rows[0]);
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ error: 'Błąd serwera.' });
+	}
+});
+
 app.delete('/api/songs/:id', async (req, res) => {
 	const { id } = req.params;
 	const { password } = req.body;
