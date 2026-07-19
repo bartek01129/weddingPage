@@ -51,7 +51,7 @@ const infoCards = [
 	{
 		id: 10,
 		title: 'Poczęstunek Nocny',
-		time: '00:30',
+		time: '01:00',
 	},
 ];
 
@@ -92,9 +92,7 @@ export default function Agenda() {
 
 									<div
 										className={
-											isLeft
-												? 'md:text-right'
-												: 'md:col-start-2 md:text-left'
+											isLeft ? 'md:text-right' : 'md:col-start-2 md:text-left'
 										}
 									>
 										<p className='font-serif italic text-accent-gold text-2xl md:text-3xl leading-none mb-2'>
