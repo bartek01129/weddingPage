@@ -4,6 +4,25 @@ import SectionHeading from './ui/SectionHeading';
 
 const API_URL = '/api/songs';
 
+// Stały, anonimowy identyfikator urządzenia/przeglądarki (localStorage).
+// Głos jest przypisany do tego tokenu — działa na Android/iOS/Mac/Windows.
+function getVoterToken() {
+	try {
+		let token = localStorage.getItem('voterToken');
+		if (!token) {
+			token =
+				typeof crypto !== 'undefined' && crypto.randomUUID
+					? crypto.randomUUID()
+					: `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+			localStorage.setItem('voterToken', token);
+		}
+		return token;
+	} catch {
+		// tryb prywatny bez dostępu do localStorage — token na czas sesji
+		return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+	}
+}
+
 function getYouTubeId(link) {
 	if (!link) return null;
 	try {
@@ -64,7 +83,10 @@ export default function Songs() {
 	const [deletingId, setDeletingId] = useState(null);
 	const [showAdminInput, setShowAdminInput] = useState(null); // song id
 
-	// Upvoted IDs stored in sessionStorage
+	// Anonimowy token głosującego (trwały, per-urządzenie)
+	const voterToken = useRef(getVoterToken()).current;
+
+	// Upvoted IDs (źródłem prawdy jest serwer via /voted)
 	const [upvotedIds, setUpvotedIds] = useState(new Set());
 
 	// YouTube playback
@@ -119,7 +141,9 @@ export default function Songs() {
 		try {
 			const [songsRes, votedRes] = await Promise.all([
 				fetch(API_URL),
-				fetch(`${API_URL}/voted`),
+				fetch(`${API_URL}/voted`, {
+					headers: { 'X-Voter-Token': voterToken },
+				}),
 			]);
 
 			if (!songsRes.ok || !votedRes.ok) throw new Error();
@@ -136,7 +160,7 @@ export default function Songs() {
 		} finally {
 			setIsLoading(false);
 		}
-	}, []);
+	}, [voterToken]);
 
 	useEffect(() => {
 		fetchSongs();
@@ -149,6 +173,7 @@ export default function Songs() {
 		try {
 			const res = await fetch(`${API_URL}/${id}/${endpoint}`, {
 				method: 'POST',
+				headers: { 'X-Voter-Token': voterToken },
 			});
 			const data = await res.json();
 
@@ -158,7 +183,6 @@ export default function Songs() {
 				if (hasVoted) newSet.delete(id);
 				else newSet.add(id);
 				setUpvotedIds(newSet);
-				sessionStorage.setItem('upvotedSongs', JSON.stringify([...newSet]));
 				return;
 			}
 
@@ -173,7 +197,6 @@ export default function Songs() {
 			if (hasVoted) newSet.delete(id);
 			else newSet.add(id);
 			setUpvotedIds(newSet);
-			sessionStorage.setItem('upvotedSongs', JSON.stringify([...newSet]));
 		} catch {
 			// silent fail
 		}

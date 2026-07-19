@@ -44,12 +44,36 @@ async function initDB() {
       CREATE TABLE IF NOT EXISTS upvotes (
         id INT AUTO_INCREMENT PRIMARY KEY,
         song_id INT NOT NULL,
+        voter_token VARCHAR(64),
         ip VARCHAR(45) NOT NULL,
         user_agent VARCHAR(500) NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE KEY unique_vote (song_id, ip, user_agent(100))
+        UNIQUE KEY unique_token_vote (song_id, voter_token),
+        INDEX idx_voter_token (voter_token)
       )
     `);
+
+		// Migracje dla istniejących baz (idempotentne — błędy "już istnieje" są ignorowane)
+		const migrations = [
+			'ALTER TABLE upvotes ADD COLUMN voter_token VARCHAR(64) NULL',
+			'ALTER TABLE upvotes ADD INDEX idx_voter_token (voter_token)',
+			'ALTER TABLE upvotes DROP INDEX unique_vote',
+			'ALTER TABLE upvotes ADD UNIQUE KEY unique_token_vote (song_id, voter_token)',
+		];
+		for (const sql of migrations) {
+			try {
+				await conn.execute(sql);
+			} catch (err) {
+				const benign = [
+					'ER_DUP_FIELDNAME', // kolumna już jest
+					'ER_DUP_KEYNAME', // indeks już jest
+					'ER_CANT_DROP_FIELD_OR_KEY', // indeks do usunięcia już nie istnieje
+				];
+				if (!benign.includes(err.code)) {
+					console.error('Migration error:', err.code, err.message);
+				}
+			}
+		}
 
 		await conn.execute(`
 			CREATE TABLE IF NOT EXISTS rsvps (
@@ -95,6 +119,18 @@ function getClientInfo(req) {
 		'unknown';
 	const userAgent = req.headers['user-agent']?.slice(0, 500) || 'unknown';
 	return { ip, userAgent };
+}
+
+// Token głosującego (localStorage po stronie klienta) — nagłówek lub body
+function getVoterToken(req) {
+	const raw =
+		req.headers['x-voter-token'] ||
+		req.body?.token ||
+		req.query?.token ||
+		'';
+	const token = String(raw).trim();
+	// akceptuj tylko rozsądne identyfikatory
+	return /^[\w-]{8,64}$/.test(token) ? token : null;
 }
 
 // Health check
@@ -194,9 +230,12 @@ app.post('/api/songs', async (req, res) => {
 app.post('/api/songs/:id/upvote', async (req, res) => {
 	const { id } = req.params;
 
-	const client = getClientInfo(req);
-	const ip = client.ip;
-	const userAgent = client.userAgent;
+	const token = getVoterToken(req);
+	if (!token) {
+		return res.status(400).json({ error: 'Brak identyfikatora głosującego.' });
+	}
+
+	const { ip, userAgent } = getClientInfo(req);
 
 	try {
 		const [existing] = await pool.execute('SELECT id FROM songs WHERE id = ?', [
@@ -206,10 +245,10 @@ app.post('/api/songs/:id/upvote', async (req, res) => {
 			return res.status(404).json({ error: 'Utwór nie istnieje.' });
 		}
 
-		// Sprawdź czy już głosował
+		// Sprawdź czy ten token już głosował
 		const [alreadyVoted] = await pool.execute(
-			'SELECT id FROM upvotes WHERE song_id = ? AND ip = ? AND user_agent = ?',
-			[id, ip, userAgent.slice(0, 100)],
+			'SELECT id FROM upvotes WHERE song_id = ? AND voter_token = ?',
+			[id, token],
 		);
 
 		if (alreadyVoted.length > 0) {
@@ -218,8 +257,8 @@ app.post('/api/songs/:id/upvote', async (req, res) => {
 
 		// Zapisz głos i zwiększ licznik
 		await pool.execute(
-			'INSERT INTO upvotes (song_id, ip, user_agent) VALUES (?, ?, ?)',
-			[id, ip, userAgent.slice(0, 100)],
+			'INSERT INTO upvotes (song_id, voter_token, ip, user_agent) VALUES (?, ?, ?, ?)',
+			[id, token, ip, userAgent.slice(0, 100)],
 		);
 		await pool.execute('UPDATE songs SET votes = votes + 1 WHERE id = ?', [id]);
 
@@ -234,9 +273,10 @@ app.post('/api/songs/:id/upvote', async (req, res) => {
 app.post('/api/songs/:id/downvote', async (req, res) => {
 	const { id } = req.params;
 
-	const client = getClientInfo(req);
-	const ip = client.ip;
-	const userAgent = client.userAgent;
+	const token = getVoterToken(req);
+	if (!token) {
+		return res.status(400).json({ error: 'Brak identyfikatora głosującego.' });
+	}
 
 	try {
 		const [existing] = await pool.execute('SELECT id FROM songs WHERE id = ?', [
@@ -246,10 +286,10 @@ app.post('/api/songs/:id/downvote', async (req, res) => {
 			return res.status(404).json({ error: 'Utwór nie istnieje.' });
 		}
 
-		// Sprawdź czy ten użytkownik oddał głos
+		// Sprawdź czy ten token oddał głos
 		const [alreadyVoted] = await pool.execute(
-			'SELECT id FROM upvotes WHERE song_id = ? AND ip = ? AND user_agent = ?',
-			[id, ip, userAgent.slice(0, 100)],
+			'SELECT id FROM upvotes WHERE song_id = ? AND voter_token = ?',
+			[id, token],
 		);
 
 		if (alreadyVoted.length === 0) {
@@ -260,8 +300,8 @@ app.post('/api/songs/:id/downvote', async (req, res) => {
 
 		// Usuń głos i zmniejsz licznik (nie schodząc poniżej zera)
 		await pool.execute(
-			'DELETE FROM upvotes WHERE song_id = ? AND ip = ? AND user_agent = ?',
-			[id, ip, userAgent.slice(0, 100)],
+			'DELETE FROM upvotes WHERE song_id = ? AND voter_token = ?',
+			[id, token],
 		);
 		await pool.execute(
 			'UPDATE songs SET votes = GREATEST(votes - 1, 0) WHERE id = ?',
@@ -302,16 +342,30 @@ app.delete('/api/songs/:id', async (req, res) => {
 });
 
 app.get('/api/songs/voted', async (req, res) => {
-	const ip =
-		req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-		req.socket.remoteAddress ||
-		'unknown';
-	const userAgent = req.headers['user-agent']?.slice(0, 100) || 'unknown';
+	const token = getVoterToken(req);
+	const { ip, userAgent } = getClientInfo(req);
 
 	try {
+		// Brak tokenu (np. stary klient) — zachowanie zgodne wstecz: dopasowanie po IP
+		if (!token) {
+			const [rows] = await pool.execute(
+				'SELECT song_id FROM upvotes WHERE ip = ? AND user_agent = ?',
+				[ip, userAgent.slice(0, 100)],
+			);
+			return res.json(rows.map((r) => r.song_id));
+		}
+
+		// Przejmij stare głosy tego urządzenia (oddane jeszcze bez tokenu) i podepnij token.
+		// Tylko wiersze bez tokenu — pierwsze wejście „zawłaszcza" głos.
+		await pool.execute(
+			`UPDATE upvotes SET voter_token = ?
+			 WHERE voter_token IS NULL AND ip = ? AND user_agent = ?`,
+			[token, ip, userAgent.slice(0, 100)],
+		);
+
 		const [rows] = await pool.execute(
-			'SELECT song_id FROM upvotes WHERE ip = ? AND user_agent = ?',
-			[ip, userAgent],
+			'SELECT song_id FROM upvotes WHERE voter_token = ?',
+			[token],
 		);
 		res.json(rows.map((r) => r.song_id));
 	} catch (err) {
