@@ -1,87 +1,267 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 
-const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const API_URL = '/api/photos';
+const MAX_BYTES = 15 * 1024 * 1024;
+const PAGE_SIZE = 40;
+const OPTIMISTIC_WINDOW_MS = 60_000;
+
+const ADMIN_TOKEN = new URLSearchParams(window.location.search).get('admin');
+
+function isImage(file) {
+	const okType = file.type.startsWith('image/');
+	const okHeic = /\.(heic|heif)$/i.test(file.name);
+	return okType || okHeic;
+}
+
+const SHRINK_STEPS = [
+	{ maxPx: 3500, quality: 0.85 },
+	{ maxPx: 2600, quality: 0.8 },
+	{ maxPx: 2000, quality: 0.75 },
+	{ maxPx: 1600, quality: 0.7 },
+	{ maxPx: 1600, quality: 0.5 },
+];
+const SHRINK_TARGET_BYTES = 14 * 1024 * 1024;
+
+async function shrinkImage(file) {
+	const bitmap = await createImageBitmap(file);
+	const canvas = document.createElement('canvas');
+	const ctx = canvas.getContext('2d');
+	const longest = Math.max(bitmap.width, bitmap.height);
+
+	try {
+		let last = null;
+		for (const { maxPx, quality } of SHRINK_STEPS) {
+			const scale = Math.min(1, maxPx / longest);
+			canvas.width = Math.round(bitmap.width * scale);
+			canvas.height = Math.round(bitmap.height * scale);
+			ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+			const blob = await new Promise((resolve) =>
+				canvas.toBlob(resolve, 'image/jpeg', quality),
+			);
+			if (!blob) throw new Error('Nie udało się przetworzyć zdjęcia.');
+			last = blob;
+			if (blob.size <= SHRINK_TARGET_BYTES) break;
+		}
+		if (!last || last.size > MAX_BYTES)
+			throw new Error('Nie udało się zmniejszyć zdjęcia pod limit.');
+		return new File([last], file.name.replace(/\.\w+$/, '') + '.jpg', {
+			type: 'image/jpeg',
+		});
+	} finally {
+		bitmap.close();
+	}
+}
+
+const makeId = () =>
+	typeof crypto !== 'undefined' && crypto.randomUUID
+		? crypto.randomUUID()
+		: `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+function uploadToServer(file, onProgress) {
+	return new Promise((resolve, reject) => {
+		const fd = new FormData();
+		fd.append('file', file);
+
+		const xhr = new XMLHttpRequest();
+		xhr.open('POST', API_URL);
+		xhr.upload.onprogress = (e) => {
+			if (e.lengthComputable) onProgress(e.loaded / e.total);
+		};
+		xhr.onload = () => {
+			let data;
+			try {
+				data = JSON.parse(xhr.responseText);
+			} catch {
+				reject(new Error('Błędna odpowiedź serwera'));
+				return;
+			}
+			if (xhr.status >= 200 && xhr.status < 300 && data.public_id) {
+				resolve(data);
+				return;
+			}
+			if (xhr.status === 409) {
+				reject(new Error('Galeria jest pełna — osiągnięto limit zdjęć.'));
+			} else if (xhr.status === 429) {
+				reject(
+					new Error(
+						'Za dużo przesłań na raz — odczekaj chwilę i spróbuj ponownie.',
+					),
+				);
+			} else {
+				reject(new Error(data?.error || `Błąd uploadu (${xhr.status})`));
+			}
+		};
+		xhr.onerror = () => reject(new Error('Błąd sieci podczas przesyłania'));
+		xhr.send(fd);
+	});
+}
 
 export default function PhotoBooth() {
 	const navigate = useNavigate();
 	const [photos, setPhotos] = useState([]);
-	const [uploading, setUploading] = useState(false);
-	const [selectedImage, setSelectedImage] = useState(null);
+	const [queue, setQueue] = useState([]);
+	const [errorMsg, setErrorMsg] = useState('');
+	const [selectedId, setSelectedId] = useState(null);
 	const [loadedImages, setLoadedImages] = useState(new Set());
+	const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+	const sentinelRef = useRef(null);
+	const photosLenRef = useRef(0);
+	photosLenRef.current = photos.length;
 
-	const fetchPhotos = async () => {
+	const fetchPhotos = useCallback(async () => {
 		try {
-			const res = await fetch(API_URL);
+			const res = await fetch(API_URL, { cache: 'no-store' });
+			if (!res.ok) return;
 			const data = await res.json();
-			setPhotos(data);
-		} catch (err) {
-			console.error('Błąd pobierania galerii');
+			if (!Array.isArray(data)) return;
+			setPhotos((prev) => {
+				const known = new Set(data.map((p) => p.public_id));
+				const now = Date.now();
+				const pending = prev.filter(
+					(p) =>
+						!known.has(p.public_id) &&
+						now - new Date(p.created_at).getTime() < OPTIMISTIC_WINDOW_MS,
+				);
+				return [...data, ...pending].sort(
+					(a, b) => new Date(b.created_at) - new Date(a.created_at),
+				);
+			});
+		} catch {
+			/* empty */
 		}
-	};
-
-	useEffect(() => {
-		fetchPhotos();
-		window.scrollTo(0, 0);
 	}, []);
 
-	const handleUpload = async (e) => {
-		const file = e.target.files[0];
-		if (!file) return;
+	useEffect(() => {
+		window.scrollTo(0, 0);
+		fetchPhotos();
+		const id = setInterval(fetchPhotos, 30_000);
+		return () => clearInterval(id);
+	}, [fetchPhotos]);
 
-		setUploading(true);
+	useEffect(() => {
+		const el = sentinelRef.current;
+		if (!el) return;
+		const io = new IntersectionObserver(
+			(entries) => {
+				if (entries[0].isIntersecting) {
+					setVisibleCount((c) => (c < photosLenRef.current ? c + PAGE_SIZE : c));
+				}
+			},
+			{ rootMargin: '600px' },
+		);
+		io.observe(el);
+		return () => io.disconnect();
+	}, []);
 
-		const formData = new FormData();
-		formData.append('file', file);
-		formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+	const handleFiles = async (fileList) => {
+		const files = Array.from(fileList || []);
+		if (!files.length) return;
+		setErrorMsg('');
+		setQueue((q) => q.filter((it) => it.status === 'uploading'));
 
-		try {
-			const cloudRes = await fetch(
-				`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
-				{ method: 'POST', body: formData },
-			);
-			const cloudData = await cloudRes.json();
+		const accepted = files.filter(isImage);
+		const rejected = files.length - accepted.length;
+		if (rejected > 0)
+			setErrorMsg(`Pominięto ${rejected} plik(ów) — to nie są zdjęcia.`);
 
-			if (cloudData.secure_url) {
-				const dbRes = await fetch(API_URL, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						url: cloudData.secure_url,
-						public_id: cloudData.public_id,
-					}),
-				});
-
-				if (dbRes.ok) {
-					fetchPhotos();
+		for (let file of accepted) {
+			if (file.size > MAX_BYTES) {
+				try {
+					file = await shrinkImage(file);
+				} catch {
+					setErrorMsg(
+						`Pominięto „${file.name}" — plik jest za duży i nie udało się go zmniejszyć.`,
+					);
+					continue;
 				}
 			}
-		} catch (err) {
-			alert('Wystąpił błąd podczas przesyłania zdjęcia');
-		} finally {
-			setUploading(false);
-			e.target.value = '';
+			const id = makeId();
+			setQueue((q) => [
+				...q,
+				{ id, name: file.name, progress: 0, status: 'uploading' },
+			]);
+			try {
+				const data = await uploadToServer(file, (p) =>
+					setQueue((q) =>
+						q.map((it) => (it.id === id ? { ...it, progress: p } : it)),
+					),
+				);
+				setPhotos((prev) => {
+					if (prev.some((p) => p.public_id === data.public_id)) return prev;
+					return [data, ...prev];
+				});
+				setQueue((q) =>
+					q.map((it) =>
+						it.id === id ? { ...it, progress: 1, status: 'done' } : it,
+					),
+				);
+			} catch (err) {
+				setQueue((q) =>
+					q.map((it) => (it.id === id ? { ...it, status: 'error' } : it)),
+				);
+				setErrorMsg(err.message || 'Nie udało się przesłać zdjęcia.');
+			}
+		}
+		setTimeout(
+			() => setQueue((q) => q.filter((it) => it.status !== 'done')),
+			2500,
+		);
+	};
+
+	const onInputChange = (e) => {
+		handleFiles(e.target.files);
+		e.target.value = '';
+	};
+
+	const handleDeletePhoto = async (e, photo) => {
+		e.stopPropagation();
+		if (!window.confirm('Usunąć to zdjęcie?')) return;
+		try {
+			const res = await fetch(`${API_URL}/${photo.id}`, {
+				method: 'DELETE',
+				headers: { 'X-Admin-Token': ADMIN_TOKEN },
+			});
+			if (res.status === 204) {
+				setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
+			} else if (res.status === 401) {
+				setErrorMsg('Błędny token administratora.');
+			} else {
+				setErrorMsg('Nie udało się usunąć zdjęcia.');
+			}
+		} catch {
+			setErrorMsg('Nie udało się usunąć zdjęcia.');
 		}
 	};
 
+	const selectedIndex = photos.findIndex((p) => p.id === selectedId);
+	const selectedPhoto = selectedIndex === -1 ? null : photos[selectedIndex];
+	const goPrev = () =>
+		selectedIndex > 0 && setSelectedId(photos[selectedIndex - 1].id);
+	const goNext = () =>
+		selectedIndex !== -1 &&
+		selectedIndex < photos.length - 1 &&
+		setSelectedId(photos[selectedIndex + 1].id);
+
 	useEffect(() => {
-		const handleEsc = (e) => {
-			if (e.key === 'Escape') setSelectedImage(null);
+		if (selectedIndex === -1) return;
+		const handleKey = (e) => {
+			if (e.key === 'Escape') setSelectedId(null);
+			else if (e.key === 'ArrowLeft' && selectedIndex > 0)
+				setSelectedId(photos[selectedIndex - 1].id);
+			else if (e.key === 'ArrowRight' && selectedIndex < photos.length - 1)
+				setSelectedId(photos[selectedIndex + 1].id);
 		};
-
-		if (selectedImage) {
-			window.addEventListener('keydown', handleEsc);
-			document.body.style.overflow = 'hidden';
-		}
-
+		window.addEventListener('keydown', handleKey);
+		document.body.style.overflow = 'hidden';
 		return () => {
-			window.removeEventListener('keydown', handleEsc);
+			window.removeEventListener('keydown', handleKey);
 			document.body.style.overflow = 'unset';
 		};
-	}, [selectedImage]);
+	}, [selectedIndex, photos]);
+
+	const busy = queue.some((it) => it.status === 'uploading');
 
 	return (
 		<section className='min-h-screen py-10 px-4 bg-primary-bg'>
@@ -140,16 +320,13 @@ export default function PhotoBooth() {
 								type='file'
 								accept='image/*'
 								capture='environment'
-								onChange={handleUpload}
+								onChange={onInputChange}
 								id='camera-input'
 								className='hidden'
-								disabled={uploading}
 							/>
 							<label
 								htmlFor='camera-input'
-								className={`flex-1 flex flex-col items-center gap-2 px-4 py-4 bg-accent-green text-white rounded-xl font-semibold shadow-soft cursor-pointer hover:bg-info-green active:scale-95 transition-all ${
-									uploading ? 'opacity-50 cursor-not-allowed' : ''
-								}`}
+								className='flex-1 flex flex-col items-center gap-2 px-4 py-4 bg-accent-green text-white rounded-xl font-semibold shadow-soft cursor-pointer hover:bg-info-green active:scale-95 transition-all'
 							>
 								<svg
 									className='w-6 h-6'
@@ -177,16 +354,14 @@ export default function PhotoBooth() {
 							<input
 								type='file'
 								accept='image/*'
-								onChange={handleUpload}
+								multiple
+								onChange={onInputChange}
 								id='gallery-input'
 								className='hidden'
-								disabled={uploading}
 							/>
 							<label
 								htmlFor='gallery-input'
-								className={`flex-1 flex flex-col items-center gap-2 px-4 py-4 bg-white text-accent-green border border-accent-green/40 rounded-xl font-semibold shadow-softer cursor-pointer hover:border-accent-green hover:bg-accent-green/5 active:scale-95 transition-all ${
-									uploading ? 'opacity-50 cursor-not-allowed' : ''
-								}`}
+								className='flex-1 flex flex-col items-center gap-2 px-4 py-4 bg-white text-accent-green border border-accent-green/40 rounded-xl font-semibold shadow-softer cursor-pointer hover:border-accent-green hover:bg-accent-green/5 active:scale-95 transition-all'
 							>
 								<svg
 									className='w-6 h-6'
@@ -205,11 +380,62 @@ export default function PhotoBooth() {
 							</label>
 						</div>
 
-						{uploading && (
-							<div className='mt-4 flex items-center justify-center gap-3 text-accent-green font-medium animate-pulse'>
-								<div className='animate-spin h-4 w-4 border-2 border-accent-green border-t-transparent rounded-full' />
-								<span>Przesyłanie Twojego wspomnienia...</span>
-							</div>
+						<AnimatePresence>
+							{queue.length > 0 && (
+								<motion.ul
+									initial={{ opacity: 0, height: 0 }}
+									animate={{ opacity: 1, height: 'auto' }}
+									exit={{ opacity: 0, height: 0 }}
+									className='mt-4 space-y-2 overflow-hidden'
+								>
+									{queue.map((it) => (
+										<li key={it.id} className='text-left'>
+											<div className='flex items-center justify-between gap-3 mb-1'>
+												<span className='text-xs text-text-main/60 truncate max-w-[70%]'>
+													{it.name}
+												</span>
+												<span
+													className={`text-xs font-semibold tabular-nums ${
+														it.status === 'error'
+															? 'text-red-500'
+															: it.status === 'done'
+																? 'text-accent-gold'
+																: 'text-text-main/45'
+													}`}
+												>
+													{it.status === 'error'
+														? 'Błąd'
+														: it.status === 'done'
+															? 'Gotowe'
+															: `${Math.round(it.progress * 100)}%`}
+												</span>
+											</div>
+											<div className='h-[3px] w-full bg-light-gray rounded-full overflow-hidden'>
+												<div
+													className={`h-full rounded-full transition-[width] duration-200 ${
+														it.status === 'error'
+															? 'bg-red-400'
+															: 'bg-accent-gold'
+													}`}
+													style={{
+														width: `${
+															it.status === 'error'
+																? 100
+																: Math.round(it.progress * 100)
+														}%`,
+													}}
+												/>
+											</div>
+										</li>
+									))}
+								</motion.ul>
+							)}
+						</AnimatePresence>
+
+						{errorMsg && (
+							<p className='mt-3 text-xs text-red-500 text-center font-light'>
+								{errorMsg}
+							</p>
 						)}
 					</div>
 				</div>
@@ -217,11 +443,14 @@ export default function PhotoBooth() {
 				{/* Siatka zdjęć */}
 				<div className='grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6'>
 					<AnimatePresence>
-						{photos.map((photo) => (
+						{photos.slice(0, visibleCount).map((photo) => (
 							<motion.div
 								key={photo.id}
 								layout
-								onClick={() => setSelectedImage(photo.url)}
+								initial={{ opacity: 0, scale: 0.92 }}
+								animate={{ opacity: 1, scale: 1 }}
+								exit={{ opacity: 0, scale: 0.92 }}
+								onClick={() => setSelectedId(photo.id)}
 								className='group relative aspect-[3/4] rounded-2xl overflow-hidden shadow-soft bg-white border-4 border-white cursor-pointer'
 							>
 								<div className='relative w-full h-full bg-accent-green/10'>
@@ -229,10 +458,7 @@ export default function PhotoBooth() {
 										<div className='absolute inset-0 bg-gradient-to-br from-accent-green/10 to-accent-gold/10 animate-pulse rounded-2xl' />
 									)}
 									<img
-										src={photo.url.replace(
-											'/upload/',
-											'/upload/w_400,h_533,c_fill,g_auto,q_auto:eco,f_auto/',
-										)}
+										src={photo.thumb_url}
 										alt='Wedding moment'
 										loading='lazy'
 										onLoad={() =>
@@ -242,24 +468,47 @@ export default function PhotoBooth() {
 											loadedImages.has(photo.id) ? 'opacity-100' : 'opacity-0'
 										}`}
 									/>
+									{ADMIN_TOKEN && (
+										<button
+											onClick={(e) => handleDeletePhoto(e, photo)}
+											title='Usuń zdjęcie'
+											className='absolute top-2 right-2 z-10 p-1.5 rounded-lg bg-accent-green/70 text-white/85 hover:text-white hover:bg-red-500/80 transition-colors'
+										>
+											<svg
+												className='w-4 h-4'
+												fill='none'
+												stroke='currentColor'
+												viewBox='0 0 24 24'
+											>
+												<path
+													strokeLinecap='round'
+													strokeLinejoin='round'
+													strokeWidth={1.8}
+													d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M4 7h16M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3'
+												/>
+											</svg>
+										</button>
+									)}
 								</div>
 							</motion.div>
 						))}
 					</AnimatePresence>
 				</div>
 
+				<div ref={sentinelRef} aria-hidden='true' className='h-px w-full' />
+
 				{/* LIGHTBOX - Widok pełnoekranowy */}
 				<AnimatePresence>
-					{selectedImage && (
+					{selectedPhoto && (
 						<motion.div
 							initial={{ opacity: 0 }}
 							animate={{ opacity: 1 }}
 							exit={{ opacity: 0 }}
-							onClick={() => setSelectedImage(null)}
+							onClick={() => setSelectedId(null)}
 							className='fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 cursor-zoom-out'
 						>
 							<button
-								onClick={() => setSelectedImage(null)}
+								onClick={() => setSelectedId(null)}
 								className='absolute top-6 right-6 text-white/70 hover:text-white transition-colors z-[110]'
 								title='Zamknij (Esc)'
 							>
@@ -278,14 +527,61 @@ export default function PhotoBooth() {
 								</svg>
 							</button>
 
+							{selectedIndex > 0 && (
+								<button
+									onClick={(e) => {
+										e.stopPropagation();
+										goPrev();
+									}}
+									className='absolute left-2 md:left-6 top-1/2 -translate-y-1/2 p-2 text-white/70 hover:text-white transition-colors z-[110]'
+									title='Poprzednie zdjęcie (←)'
+								>
+									<svg
+										className='w-10 h-10'
+										fill='none'
+										stroke='currentColor'
+										viewBox='0 0 24 24'
+									>
+										<path
+											strokeLinecap='round'
+											strokeLinejoin='round'
+											strokeWidth={1.8}
+											d='M15 19l-7-7 7-7'
+										/>
+									</svg>
+								</button>
+							)}
+							{selectedIndex < photos.length - 1 && (
+								<button
+									onClick={(e) => {
+										e.stopPropagation();
+										goNext();
+									}}
+									className='absolute right-2 md:right-6 top-1/2 -translate-y-1/2 p-2 text-white/70 hover:text-white transition-colors z-[110]'
+									title='Następne zdjęcie (→)'
+								>
+									<svg
+										className='w-10 h-10'
+										fill='none'
+										stroke='currentColor'
+										viewBox='0 0 24 24'
+									>
+										<path
+											strokeLinecap='round'
+											strokeLinejoin='round'
+											strokeWidth={1.8}
+											d='M9 5l7 7-7 7'
+										/>
+									</svg>
+								</button>
+							)}
+
 							<motion.img
+								key={selectedPhoto.id}
 								initial={{ scale: 0.9, opacity: 0 }}
 								animate={{ scale: 1, opacity: 1 }}
 								exit={{ scale: 0.9, opacity: 0 }}
-								src={selectedImage.replace(
-									'/upload/',
-									'/upload/q_auto,f_auto/',
-								)}
+								src={selectedPhoto.web_url}
 								className='max-w-full max-h-[90vh] rounded-lg shadow-2xl object-contain cursor-default'
 								onClick={(e) => e.stopPropagation()}
 							/>
@@ -293,7 +589,7 @@ export default function PhotoBooth() {
 					)}
 				</AnimatePresence>
 
-				{photos.length === 0 && !uploading && (
+				{photos.length === 0 && !busy && (
 					<div className='text-center py-20 text-text-main/40 font-serif italic'>
 						Nie ma jeszcze żadnych zdjęć. Bądź pierwszy!
 					</div>

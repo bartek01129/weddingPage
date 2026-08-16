@@ -3,12 +3,31 @@ import cors from 'cors';
 import nodemailer from 'nodemailer';
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
-import { randomUUID } from 'crypto';
+import path from 'node:path';
+import crypto, { randomUUID } from 'crypto';
+import rateLimit from 'express-rate-limit';
+
+import * as store from './store.js';
+import { UUID_RE } from './store.js';
+import * as images from './images.js';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+const DATA_DIR = process.env.DATA_DIR || '/data/photos';
+const MAX_PHOTOS = Number(process.env.MAX_PHOTOS || 1000);
+const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB || 15);
+const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
+
+const dirs = {
+	originals: path.join(DATA_DIR, 'originals'),
+	web: path.join(DATA_DIR, 'web'),
+	thumbs: path.join(DATA_DIR, 'thumbs'),
+	tmp: path.join(DATA_DIR, 'tmp'),
+};
 
 app.set('trust proxy', 1);
 app.use(
@@ -19,6 +38,15 @@ app.use(
 	}),
 );
 app.use(express.json());
+
+const staticOpts = {
+	immutable: true,
+	maxAge: '365d',
+	index: false,
+	fallthrough: false,
+};
+app.use('/photos/web', express.static(dirs.web, staticOpts));
+app.use('/photos/thumbs', express.static(dirs.thumbs, staticOpts));
 
 //Nodemailer
 const transporter = nodemailer.createTransport({
@@ -107,15 +135,6 @@ async function initDB() {
 				attending ENUM('yes', 'no') NOT NULL,
 				guests INT DEFAULT 0,
 				companions JSON,
-				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-			)
-		`);
-
-		await conn.execute(`
-			CREATE TABLE IF NOT EXISTS photos (
-				id INT AUTO_INCREMENT PRIMARY KEY,
-				url VARCHAR(500) NOT NULL,
-				public_id VARCHAR(255),
 				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 			)
 		`);
@@ -457,39 +476,118 @@ app.get('/api/songs/voted', async (req, res) => {
 	}
 });
 
-//CLOUDINARY - PHOTO BOOTH
-app.get('/api/photos', async (req, res) => {
-	try {
-		const [rows] = await pool.execute(
-			'SELECT * FROM photos ORDER BY created_at DESC',
-		);
-		res.json(rows);
-	} catch (err) {
-		res.status(500).json({ error: 'Błąd pobierania zdjęć z cloud' });
-	}
+// PHOTO BOOTH
+function toPhoto(rec) {
+	return {
+		id: rec.id,
+		public_id: rec.id,
+		thumb_url: `/photos/thumbs/${rec.id}.webp`,
+		web_url: `/photos/web/${rec.id}.webp`,
+		url: `/photos/web/${rec.id}.webp`,
+		created_at: rec.created_at,
+	};
+}
+
+function tokenMatches(provided) {
+	const a = Buffer.from(provided);
+	const b = Buffer.from(ADMIN_TOKEN);
+	if (a.length !== b.length) return false;
+	return crypto.timingSafeEqual(a, b);
+}
+
+app.get('/api/photos', (req, res) => {
+	res.set('Cache-Control', 'no-store');
+	res.json(store.getAll().map(toPhoto));
 });
 
-app.post('/api/photos', async (req, res) => {
-	const { url, public_id } = req.body;
-	try {
-		await pool.execute('INSERT INTO photos (url, public_id) VALUES (?, ?)', [
-			url,
-			public_id,
-		]);
-		res.json({ success: true });
-	} catch (err) {
-		res.status(500).json({ error: 'Błąd zapisu zdjęcia' });
+const uploadLimiter = rateLimit({
+	windowMs: 10 * 60 * 1000,
+	limit: 30,
+	standardHeaders: true,
+	legacyHeaders: false,
+	handler: (req, res) =>
+		res.status(429).json({ error: 'Za dużo przesłań, spróbuj za chwilę.' }),
+});
+
+const upload = images.createUpload(dirs, MAX_UPLOAD_BYTES);
+
+app.post('/api/photos', uploadLimiter, (req, res) => {
+	upload.single('file')(req, res, async (err) => {
+		if (err) {
+			if (err.code === 'LIMIT_FILE_SIZE') {
+				return res
+					.status(413)
+					.json({ error: `Plik za duży (max ${MAX_UPLOAD_MB} MB).` });
+			}
+			return res.status(500).json({ error: 'Błąd przesyłania pliku.' });
+		}
+		if (!req.file) return res.status(400).json({ error: 'To nie jest obraz.' });
+
+		if (store.count() >= MAX_PHOTOS) {
+			await images.safeUnlink(req.file.path);
+			return res
+				.status(409)
+				.json({ error: 'Galeria jest pełna.', code: 'GALLERY_FULL' });
+		}
+
+		let rec;
+		let inserted = false;
+		try {
+			rec = await images.processUpload(req.file.path, dirs);
+			const result = await store.insert(rec);
+			inserted = result.ok;
+			if (!result.ok) {
+				await images.removeFiles(rec.id, rec.original_ext, dirs);
+				return res
+					.status(409)
+					.json({ error: 'Galeria jest pełna.', code: 'GALLERY_FULL' });
+			}
+			return res.status(201).json(toPhoto(rec));
+		} catch (e) {
+			if (rec && !inserted)
+				await images.removeFiles(rec.id, rec.original_ext, dirs);
+			if (e.code === 'NOT_IMAGE') {
+				return res.status(400).json({ error: 'To nie jest obraz.' });
+			}
+			console.error('Upload error:', e);
+			return res.status(500).json({ error: 'Nie udało się zapisać zdjęcia.' });
+		}
+	});
+});
+
+app.delete('/api/photos/:id', async (req, res) => {
+	if (!ADMIN_TOKEN || !tokenMatches(req.get('X-Admin-Token') || '')) {
+		return res.status(401).json({ error: 'Brak autoryzacji.' });
 	}
+
+	const { id } = req.params;
+	if (!UUID_RE.test(id))
+		return res.status(404).json({ error: 'Nie znaleziono zdjęcia.' });
+
+	const rec = await store.remove(id);
+	if (!rec) return res.status(404).json({ error: 'Nie znaleziono zdjęcia.' });
+
+	await images.removeFiles(id, rec.original_ext, dirs);
+	return res.status(204).end();
 });
 
 // Start backend
-initDB()
-	.then(() => {
-		app.listen(PORT, () => {
-			console.log(`  Wedding backend running on port ${PORT}`);
-		});
-	})
-	.catch((err) => {
-		console.error(' DB init failed:', err);
-		process.exit(1);
+async function main() {
+	images.initSharp();
+	const loaded = await store.init({
+		dataDir: DATA_DIR,
+		dirs,
+		maxPhotos: MAX_PHOTOS,
 	});
+	await initDB();
+	app.listen(PORT, () => {
+		console.log(
+			`  Wedding backend running on port ${PORT} (DATA_DIR: ${DATA_DIR}, zdjęć: ${loaded})`,
+		);
+	});
+}
+
+main().catch((err) => {
+	console.error(' Boot error:', err);
+	process.exit(1);
+});

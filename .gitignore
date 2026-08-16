@@ -25,8 +25,9 @@ Thumbs.db
 *.log
 npm-debug.log*
 
-# Docker
-.dockerignore
-
 # Print materials
 print/
+
+# Local dev photo storage
+backend/data/
+backend/data-*/

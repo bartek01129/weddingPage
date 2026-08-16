@@ -4,9 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'backend/server.js'
-      - 'backend/package.json'
-      - 'backend/Dockerfile'
+      - 'backend/**'
       - 'frontend/src/**'
       - 'frontend/package.json'
       - 'frontend/Dockerfile'
@@ -28,9 +26,7 @@ jobs:
         with:
           filters: |
             backend:
-              - 'backend/server.js'
-              - 'backend/package.json'
-              - 'backend/Dockerfile'
+              - 'backend/**'
             frontend:
               - 'frontend/src/**'
               - 'frontend/package.json'
@@ -106,8 +102,6 @@ jobs:
           tags: ${{ secrets.DOCKER_USERNAME }}/bartek:slubpaulinabartek-frontend
           build-args: |
             VITE_PASSWORD=${{ secrets.VITE_PASSWORD }}
-            VITE_CLOUDINARY_CLOUD_NAME=${{ secrets.VITE_CLOUDINARY_CLOUD_NAME }}
-            VITE_CLOUDINARY_UPLOAD_PRESET=${{ secrets.VITE_CLOUDINARY_UPLOAD_PRESET }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -153,6 +147,9 @@ jobs:
             export COUPLE_EMAIL="${{ secrets.COUPLE_EMAIL }}"
             export COUPLE_NAMES="${{ secrets.COUPLE_NAMES }}"
             export DB_URL="${{ secrets.DB_URL }}"
+            export ADMIN_TOKEN="${{ secrets.ADMIN_TOKEN }}"
+
+            mkdir -p photos-data
 
             docker pull ${{ secrets.DOCKER_USERNAME }}/bartek:slubpaulinabartek-backend
             docker pull ${{ secrets.DOCKER_USERNAME }}/bartek:slubpaulinabartek-frontend

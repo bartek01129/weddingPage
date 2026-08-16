@@ -14,11 +14,17 @@ services:
       - COUPLE_EMAIL=${COUPLE_EMAIL}
       - COUPLE_NAMES=${COUPLE_NAMES}
       - DB_URL=${DB_URL}
+      - DATA_DIR=/data/photos
+      - MAX_PHOTOS=1000
+      - MAX_UPLOAD_MB=15
+      - ADMIN_TOKEN=${ADMIN_TOKEN}
+    volumes:
+      - ./photos-data:/data/photos
     networks:
       - web
     labels:
       - 'traefik.enable=true'
-      - 'traefik.http.routers.slub-api.rule=Host(`slubpaulinabartek.pl`) && PathPrefix(`/api`)'
+      - 'traefik.http.routers.slub-api.rule=Host(`slubpaulinabartek.pl`) && (PathPrefix(`/api`) || PathPrefix(`/photos`))'
       - 'traefik.http.routers.slub-api.entrypoints=websecure'
       - 'traefik.http.routers.slub-api.tls.certresolver=my-resolver'
       - 'traefik.http.routers.slub-api.priority=20'
