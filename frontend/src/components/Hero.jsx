@@ -98,14 +98,14 @@ export default function Hero() {
 					Sobota &middot; godz. 15:00
 				</motion.p>
 
-				<motion.div variants={itemVariants}>
+				{/* <motion.div variants={itemVariants}>
 					<a
 						href='#rsvp'
 						className='inline-block px-10 py-4 border border-white/70 rounded-full text-white font-sans font-semibold text-sm uppercase tracking-elegant backdrop-blur-sm hover:bg-white hover:text-accent-green hover:border-white transition-all duration-500'
 					>
 						Potwierdź przybycie
 					</a>
-				</motion.div>
+				</motion.div> */}
 			</motion.div>
 
 			{/* Wskaźnik przewijania */}
