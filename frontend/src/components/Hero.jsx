@@ -110,7 +110,7 @@ export default function Hero() {
 
 			{/* Wskaźnik przewijania */}
 			<motion.a
-				href='#countdown'
+				href='#podziekowania'
 				aria-label='Przewiń w dół'
 				className='absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2'
 				initial={{ opacity: 0 }}

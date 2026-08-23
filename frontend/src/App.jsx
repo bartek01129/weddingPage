@@ -7,19 +7,21 @@ import {
 	Link,
 } from 'react-router-dom';
 import Hero from './components/Hero';
-import Info from './components/Info';
-import Map from './components/Map';
-import RSVP from './components/RSVP';
-import Footer from './components/Footer';
-import Countdown from './components/Countdown';
-import Welcome from './components/Welcome';
-import Gifts from './components/Gifts';
-import Contact from './components/Contact';
+import Thanks from './components/Thanks';
 import PasswordProtection from './components/PasswordProtection';
-import Songs from './components/Songs';
 import PhotoBooth from './components/page/PhotoBooth';
 import './App.css';
-import Agenda from './components/Agenda';
+// Sekcje wyłączone po ślubie:
+// import Info from './components/Info';
+// import Map from './components/Map';
+// import RSVP from './components/RSVP';
+// import Footer from './components/Footer';
+// import Countdown from './components/Countdown';
+// import Welcome from './components/Welcome';
+// import Gifts from './components/Gifts';
+// import Contact from './components/Contact';
+// import Songs from './components/Songs';
+// import Agenda from './components/Agenda';
 
 export default function App() {
 	const [isAuthenticated, setIsAuthenticated] = useState(
@@ -45,8 +47,7 @@ export default function App() {
 							) : (
 								<>
 									<Hero />
-									<Countdown />
-									<Welcome />
+									<Thanks />
 
 									<section className='py-16 px-4 bg-primary-bg'>
 										<div className='max-w-2xl mx-auto'>
@@ -87,14 +88,18 @@ export default function App() {
 											</div>
 										</div>
 									</section>
+									{/* Sekcje wyłączone po ślubie:
+									<Countdown />
+									<Welcome />
 									<Agenda />
 									<Info />
 									<Map />
-									{/* <RSVP /> */}
+									<RSVP />
 									<Gifts />
 									<Contact />
 									<Songs />
 									<Footer />
+									*/}
 								</>
 							)
 						}
