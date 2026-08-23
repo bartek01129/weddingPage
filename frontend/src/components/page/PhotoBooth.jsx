@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 
 const API_URL = '/api/photos';
 const PAGE_SIZE = 40;
 const OPTIMISTIC_WINDOW_MS = 60_000;
+const SWIPE_DISTANCE = 70; // px potrzebne do zmiany zdjęcia
+const SWIPE_VELOCITY = 400; // px/s — szybki flick też przewija
+const EDGE_RESISTANCE = 0.18; // opór na pierwszym/ostatnim zdjęciu
 
 const ADMIN_TOKEN = new URLSearchParams(window.location.search).get('admin');
 
@@ -181,12 +184,44 @@ export default function PhotoBooth() {
 
 	const selectedIndex = photos.findIndex((p) => p.id === selectedId);
 	const selectedPhoto = selectedIndex === -1 ? null : photos[selectedIndex];
-	const goPrev = () =>
-		selectedIndex > 0 && setSelectedId(photos[selectedIndex - 1].id);
-	const goNext = () =>
-		selectedIndex !== -1 &&
-		selectedIndex < photos.length - 1 &&
+	const hasPrev = selectedIndex > 0;
+	const hasNext = selectedIndex !== -1 && selectedIndex < photos.length - 1;
+	// Swipe w lightboxie — bez zapętlania na skrajnych zdjęciach
+	const dragX = useMotionValue(0);
+
+	const goPrev = () => {
+		if (!hasPrev) return;
+		dragX.set(0);
+		setSelectedId(photos[selectedIndex - 1].id);
+	};
+	const goNext = () => {
+		if (!hasNext) return;
+		dragX.set(0);
 		setSelectedId(photos[selectedIndex + 1].id);
+	};
+
+	useEffect(() => {
+		dragX.set(0);
+	}, [selectedId, dragX]);
+
+	// Na krańcach galerii mocno tłumimy przesunięcie (opór zamiast przewijania)
+	const handleDrag = (_, info) => {
+		const blocked =
+			(info.offset.x > 0 && !hasPrev) || (info.offset.x < 0 && !hasNext);
+		if (blocked) dragX.set(info.offset.x * EDGE_RESISTANCE);
+	};
+
+	const handleDragEnd = (_, info) => {
+		const { offset, velocity } = info;
+		const swipedRight =
+			offset.x > SWIPE_DISTANCE || velocity.x > SWIPE_VELOCITY;
+		const swipedLeft =
+			offset.x < -SWIPE_DISTANCE || velocity.x < -SWIPE_VELOCITY;
+
+		if (swipedRight && hasPrev) goPrev();
+		else if (swipedLeft && hasNext) goNext();
+		else dragX.set(0);
+	};
 
 	useEffect(() => {
 		if (selectedIndex === -1) return;
@@ -526,7 +561,16 @@ export default function PhotoBooth() {
 								animate={{ scale: 1, opacity: 1 }}
 								exit={{ scale: 0.9, opacity: 0 }}
 								src={selectedPhoto.web_url}
-								className='max-w-full max-h-[90vh] rounded-lg shadow-2xl object-contain cursor-default'
+								draggable={false}
+								drag='x'
+								dragDirectionLock
+								dragConstraints={{ left: 0, right: 0 }}
+								dragElastic={0.6}
+								dragMomentum={false}
+								style={{ x: dragX, touchAction: 'pan-y' }}
+								onDrag={handleDrag}
+								onDragEnd={handleDragEnd}
+								className='max-w-full max-h-[90vh] rounded-lg shadow-2xl object-contain cursor-default select-none'
 								onClick={(e) => e.stopPropagation()}
 							/>
 						</motion.div>
