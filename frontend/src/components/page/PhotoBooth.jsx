@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 
 const API_URL = '/api/photos';
-const MAX_BYTES = 15 * 1024 * 1024;
 const PAGE_SIZE = 40;
 const OPTIMISTIC_WINDOW_MS = 60_000;
 
@@ -13,45 +12,6 @@ function isImage(file) {
 	const okType = file.type.startsWith('image/');
 	const okHeic = /\.(heic|heif)$/i.test(file.name);
 	return okType || okHeic;
-}
-
-const SHRINK_STEPS = [
-	{ maxPx: 3500, quality: 0.85 },
-	{ maxPx: 2600, quality: 0.8 },
-	{ maxPx: 2000, quality: 0.75 },
-	{ maxPx: 1600, quality: 0.7 },
-	{ maxPx: 1600, quality: 0.5 },
-];
-const SHRINK_TARGET_BYTES = 14 * 1024 * 1024;
-
-async function shrinkImage(file) {
-	const bitmap = await createImageBitmap(file);
-	const canvas = document.createElement('canvas');
-	const ctx = canvas.getContext('2d');
-	const longest = Math.max(bitmap.width, bitmap.height);
-
-	try {
-		let last = null;
-		for (const { maxPx, quality } of SHRINK_STEPS) {
-			const scale = Math.min(1, maxPx / longest);
-			canvas.width = Math.round(bitmap.width * scale);
-			canvas.height = Math.round(bitmap.height * scale);
-			ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-			const blob = await new Promise((resolve) =>
-				canvas.toBlob(resolve, 'image/jpeg', quality),
-			);
-			if (!blob) throw new Error('Nie udało się przetworzyć zdjęcia.');
-			last = blob;
-			if (blob.size <= SHRINK_TARGET_BYTES) break;
-		}
-		if (!last || last.size > MAX_BYTES)
-			throw new Error('Nie udało się zmniejszyć zdjęcia pod limit.');
-		return new File([last], file.name.replace(/\.\w+$/, '') + '.jpg', {
-			type: 'image/jpeg',
-		});
-	} finally {
-		bitmap.close();
-	}
 }
 
 const makeId = () =>
@@ -83,12 +43,6 @@ function uploadToServer(file, onProgress) {
 			}
 			if (xhr.status === 409) {
 				reject(new Error('Galeria jest pełna — osiągnięto limit zdjęć.'));
-			} else if (xhr.status === 429) {
-				reject(
-					new Error(
-						'Za dużo przesłań na raz — odczekaj chwilę i spróbuj ponownie.',
-					),
-				);
 			} else {
 				reject(new Error(data?.error || `Błąd uploadu (${xhr.status})`));
 			}
@@ -166,17 +120,7 @@ export default function PhotoBooth() {
 		if (rejected > 0)
 			setErrorMsg(`Pominięto ${rejected} plik(ów) — to nie są zdjęcia.`);
 
-		for (let file of accepted) {
-			if (file.size > MAX_BYTES) {
-				try {
-					file = await shrinkImage(file);
-				} catch {
-					setErrorMsg(
-						`Pominięto „${file.name}" — plik jest za duży i nie udało się go zmniejszyć.`,
-					);
-					continue;
-				}
-			}
+		for (const file of accepted) {
 			const id = makeId();
 			setQueue((q) => [
 				...q,

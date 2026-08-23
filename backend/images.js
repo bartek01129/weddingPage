@@ -58,13 +58,13 @@ export function initSharp() {
 	sharp.concurrency(1);
 }
 
-export function createUpload(dirs, maxUploadBytes) {
+export function createUpload(dirs) {
 	const storage = multer.diskStorage({
 		// Piszemy na dysk do tmp/, NIE do RAM — mały VPS, oszczędzamy pamięć.
 		destination: (req, file, cb) => cb(null, dirs.tmp),
 		filename: (req, file, cb) => cb(null, `${randomUUID()}.upload`),
 	});
-	return multer({ storage, limits: { fileSize: maxUploadBytes, files: 1 } });
+	return multer({ storage, limits: { files: 1 } });
 }
 
 async function safeUnlink(file) {
@@ -110,7 +110,7 @@ async function decodeInput(tempPath) {
 
 	// 2) HEIC: na alpine sharp bez libheif go nie czyta → konwersja przez WASM.
 	// Pełny bufor pliku ładujemy DOPIERO w semaforze — równoległe uploady
-	// czekające w kolejce nie mogą trzymać po 15 MB w RAM każdy.
+	// czekające w kolejce nie mogą trzymać całych plików w RAM naraz.
 	if (isHeic(await readHeader(tempPath))) {
 		const jpeg = await withSem(heicSem, async () =>
 			heicConvert({

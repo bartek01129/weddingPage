@@ -12,7 +12,6 @@ services:
       - FRONTEND_URL=http://localhost
       - DATA_DIR=/data/photos
       - MAX_PHOTOS=1000
-      - MAX_UPLOAD_MB=15
       - ADMIN_TOKEN=devtoken
     volumes:
       - ./backend/data:/data/photos

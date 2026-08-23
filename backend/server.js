@@ -5,7 +5,6 @@ import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
 import path from 'node:path';
 import crypto, { randomUUID } from 'crypto';
-import rateLimit from 'express-rate-limit';
 
 import * as store from './store.js';
 import { UUID_RE } from './store.js';
@@ -18,8 +17,6 @@ const PORT = process.env.PORT || 3001;
 
 const DATA_DIR = process.env.DATA_DIR || '/data/photos';
 const MAX_PHOTOS = Number(process.env.MAX_PHOTOS || 1000);
-const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB || 15);
-const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
 
 const dirs = {
@@ -500,25 +497,11 @@ app.get('/api/photos', (req, res) => {
 	res.json(store.getAll().map(toPhoto));
 });
 
-const uploadLimiter = rateLimit({
-	windowMs: 10 * 60 * 1000,
-	limit: 30,
-	standardHeaders: true,
-	legacyHeaders: false,
-	handler: (req, res) =>
-		res.status(429).json({ error: 'Za dużo przesłań, spróbuj za chwilę.' }),
-});
+const upload = images.createUpload(dirs);
 
-const upload = images.createUpload(dirs, MAX_UPLOAD_BYTES);
-
-app.post('/api/photos', uploadLimiter, (req, res) => {
+app.post('/api/photos', (req, res) => {
 	upload.single('file')(req, res, async (err) => {
 		if (err) {
-			if (err.code === 'LIMIT_FILE_SIZE') {
-				return res
-					.status(413)
-					.json({ error: `Plik za duży (max ${MAX_UPLOAD_MB} MB).` });
-			}
 			return res.status(500).json({ error: 'Błąd przesyłania pliku.' });
 		}
 		if (!req.file) return res.status(400).json({ error: 'To nie jest obraz.' });

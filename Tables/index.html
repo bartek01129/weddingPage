@@ -1,0 +1,2019 @@
+<!doctype html>
+<html lang="pl">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Stoliki — Paulina &amp; Bartek</title>
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Cormorant+Garamond:wght@300;400;500;600&family=Montserrat:wght@300;400;500;600&family=Pinyon+Script&family=Great+Vibes&family=Parisienne&display=swap"
+			rel="stylesheet"
+		/>
+
+		<!-- Podmieniane z JS przy zmianie orientacji -->
+		<style id="page-style">
+			@page {
+				size: 210mm 297mm;
+				margin: 0;
+			}
+		</style>
+
+		<style>
+			:root {
+				/* --- Szałwia — dokładnie ta sama zieleń co na winietkach --- */
+				--sage: #3e4a38; /* napis „Stolik”, wstążka, numer */
+				--sage-dark: #333d2d; /* hover */
+				--sage-fold: #3e4a38; /* UI: przyciski, checkboxy */
+				--sage-ink: #3e4a38; /* numer stolika */
+				--sage-line: #c6cbc1; /* włosowe linie, ramka */
+				--ink: #3e4a38; /* nazwiska gości */
+
+				/* --- UI (tylko ekran) --- */
+				--ui-green: #253b2d;
+				--ui-gold: #c5a059;
+				--ui-bg: #eef0ea;
+				--ui-line: #dcdfd4;
+			}
+
+			* {
+				margin: 0;
+				padding: 0;
+				box-sizing: border-box;
+			}
+
+			html,
+			body {
+				height: 100%;
+			}
+
+			body {
+				display: flex;
+				background: var(--ui-bg);
+				font-family: 'Montserrat', sans-serif;
+				color: #33372f;
+			}
+
+			/* ==========================================================
+			   PANEL STEROWANIA — tylko ekran
+			   ========================================================== */
+			.controls {
+				flex: 0 0 360px;
+				height: 100vh;
+				overflow-y: auto;
+				padding: 26px 22px 48px;
+				background: #fff;
+				border-right: 1px solid var(--ui-line);
+				box-shadow: 4px 0 24px rgba(58, 75, 64, 0.06);
+			}
+
+			.controls h1 {
+				font-family: 'Playfair Display', serif;
+				font-weight: 500;
+				font-size: 27px;
+				line-height: 1.1;
+				color: var(--ui-green);
+			}
+			.controls h1 .amp {
+				font-style: italic;
+				color: var(--ui-gold);
+			}
+			.subtitle {
+				margin-top: 4px;
+				font-size: 11px;
+				letter-spacing: 0.18em;
+				text-transform: uppercase;
+				color: var(--ui-gold);
+			}
+
+			.rule {
+				height: 1px;
+				margin: 20px 0;
+				background: linear-gradient(
+					to right,
+					rgba(62, 74, 56, 0.55),
+					rgba(62, 74, 56, 0)
+				);
+			}
+
+			.field {
+				margin-bottom: 16px;
+			}
+			.field > label,
+			.field-label {
+				display: block;
+				margin-bottom: 6px;
+				font-size: 10px;
+				font-weight: 600;
+				letter-spacing: 0.16em;
+				text-transform: uppercase;
+				color: #7b8377;
+			}
+
+			.row2 {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 10px;
+			}
+
+			select,
+			input[type='number'],
+			input[type='text'],
+			textarea {
+				width: 100%;
+				padding: 9px 11px;
+				border: 1px solid var(--ui-line);
+				border-radius: 6px;
+				background: #fdfdfb;
+				font-family: inherit;
+				font-size: 13px;
+				color: #33372f;
+			}
+			select:focus,
+			input:focus,
+			textarea:focus {
+				outline: none;
+				border-color: var(--sage);
+				box-shadow: 0 0 0 3px rgba(62, 74, 56, 0.18);
+			}
+			textarea {
+				min-height: 84px;
+				resize: vertical;
+				line-height: 1.55;
+			}
+
+			.hint {
+				margin-top: 6px;
+				font-size: 11px;
+				line-height: 1.55;
+				color: #8b9186;
+			}
+			.hint b {
+				color: var(--ui-green);
+				font-weight: 600;
+			}
+			.hint code {
+				font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+				font-size: 10.5px;
+				background: #f2f4ee;
+				padding: 1px 4px;
+				border-radius: 3px;
+			}
+
+			/* --- Lista stolików w edytorze --- */
+			.tables-list {
+				display: flex;
+				flex-direction: column;
+				gap: 12px;
+			}
+			.table-card {
+				border: 1px solid var(--ui-line);
+				border-radius: 8px;
+				padding: 11px 11px 12px;
+				background: #fcfdfa;
+			}
+			.table-card.is-over {
+				border-color: var(--sage);
+				box-shadow: 0 0 0 3px rgba(62, 74, 56, 0.16);
+			}
+			.table-card.is-dragging {
+				opacity: 0.45;
+			}
+			.tc-head {
+				display: flex;
+				align-items: center;
+				gap: 7px;
+				margin-bottom: 8px;
+			}
+			.tc-grip {
+				flex: 0 0 auto;
+				width: 16px;
+				text-align: center;
+				font-size: 13px;
+				line-height: 1;
+				color: #b9bfb1;
+				cursor: grab;
+				user-select: none;
+			}
+			.tc-grip:active {
+				cursor: grabbing;
+			}
+			.tc-head input {
+				flex: 1;
+				padding: 7px 9px;
+				font-size: 13px;
+				font-weight: 600;
+			}
+			.tc-count {
+				flex: 0 0 auto;
+				font-size: 10.5px;
+				color: #9aa093;
+				font-variant-numeric: tabular-nums;
+				white-space: nowrap;
+			}
+			.tc-del {
+				flex: 0 0 auto;
+				width: 24px;
+				height: 24px;
+				padding: 0;
+				border-radius: 50%;
+				border: 1px solid var(--ui-line);
+				background: transparent;
+				color: #a8ada3;
+				font-size: 15px;
+				line-height: 1;
+				letter-spacing: 0;
+			}
+			.tc-del:hover {
+				border-color: #c98b8b;
+				color: #b76b6b;
+				background: #fdf4f4;
+			}
+			.table-card textarea {
+				min-height: 74px;
+				font-size: 12.5px;
+			}
+			.tc-warn {
+				margin-top: 5px;
+				font-size: 10.5px;
+				color: #b0873f;
+			}
+
+			.checks {
+				display: flex;
+				flex-direction: column;
+				gap: 9px;
+			}
+			.check {
+				display: flex;
+				align-items: center;
+				gap: 9px;
+				font-size: 12.5px;
+				color: #545a4f;
+				cursor: pointer;
+			}
+			.check input {
+				width: 15px;
+				height: 15px;
+				accent-color: var(--sage-fold);
+				cursor: pointer;
+			}
+
+			.actions {
+				display: flex;
+				flex-direction: column;
+				gap: 9px;
+				margin-top: 4px;
+			}
+			button {
+				padding: 12px 18px;
+				border: none;
+				border-radius: 999px;
+				font-family: inherit;
+				font-size: 11.5px;
+				font-weight: 600;
+				letter-spacing: 0.16em;
+				text-transform: uppercase;
+				cursor: pointer;
+				transition: background 0.15s, color 0.15s, border-color 0.15s;
+			}
+			.btn-primary {
+				background: var(--sage-fold);
+				color: #fff;
+			}
+			.btn-primary:hover {
+				background: var(--sage-dark);
+			}
+			.btn-ghost {
+				background: transparent;
+				color: var(--ui-green);
+				border: 1px solid var(--sage);
+			}
+			.btn-ghost:hover {
+				background: rgba(62, 74, 56, 0.1);
+			}
+			.btn-mini {
+				padding: 7px 14px;
+				font-size: 10px;
+				letter-spacing: 0.12em;
+				background: transparent;
+				color: #6d7468;
+				border: 1px solid var(--ui-line);
+			}
+			.btn-mini:hover {
+				border-color: var(--sage);
+				color: var(--ui-green);
+			}
+			.mini-row {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 7px;
+				margin-top: 8px;
+			}
+
+			.saved-note {
+				margin-top: 10px;
+				font-size: 10.5px;
+				color: #9aa093;
+				min-height: 14px;
+			}
+
+			/* ==========================================================
+			   SCENA / PODGLĄD
+			   ========================================================== */
+			.stage {
+				flex: 1;
+				height: 100vh;
+				overflow: auto;
+				padding: 28px 24px 60px;
+			}
+			#sheets {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				gap: 26px;
+			}
+
+			.sheet {
+				position: relative;
+				background: #fff;
+				overflow: hidden;
+				box-shadow: 0 10px 40px rgba(0, 0, 0, 0.16);
+				-webkit-print-color-adjust: exact;
+				print-color-adjust: exact;
+			}
+
+			/* Warstwy wektorowe (ramka, linijka) — współrzędne w mm,
+			   żeby wydruk nie łapał zaokrągleń pikselowych jak przy tłach CSS. */
+			.layer {
+				position: absolute;
+				left: 0;
+				top: 0;
+				pointer-events: none;
+			}
+
+			/* ==========================================================
+			   KARTA STOLIKA
+			   ========================================================== */
+			.content {
+				position: absolute;
+				inset: 0;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				text-align: center;
+			}
+
+			/* --- Wstążka: kaligraficzne przedłużenie wyrazu „Stolik” --- */
+			.ribbon {
+				flex: 0 0 auto;
+				position: relative;
+				display: flex;
+				/* flex-start, nie center — pozycję wstążki wyznacza wyłącznie
+				   margin-top liczony z realnej linii pisma (layoutRibbon) */
+				align-items: flex-start;
+				justify-content: center;
+			}
+			/* Wstęga leży pod wyrazem jako jedna warstwa na całą szerokość —
+			   ramiona muszą trafiać w konkretne punkty glifów, więc nie da się
+			   ich ustawić układem, tylko współrzędnymi. */
+			.ribbon-lines {
+				position: absolute;
+				left: 0;
+				overflow: visible;
+				pointer-events: none;
+			}
+			.ribbon-word {
+				position: relative;
+				flex: 0 0 auto;
+				line-height: 1;
+				white-space: nowrap;
+				color: var(--sage-ink);
+			}
+
+			/* --- Numer / nazwa stolika --- */
+			.number {
+				flex: 0 0 auto;
+				font-family: 'Playfair Display', serif;
+				font-weight: 400;
+				color: var(--sage-ink);
+				line-height: 1;
+			}
+			.number.is-text {
+				font-weight: 500;
+				line-height: 1.15;
+				max-width: 84%;
+			}
+
+			/* --- Goście --- */
+			.guests {
+				flex: 1 1 auto;
+				width: 100%;
+				min-height: 0;
+				display: flex;
+				/* wyśrodkowane w pionie — przy krótkiej liście kartka nie robi się
+				   górnociężka; przy przepełnieniu przełączamy na flex-start z JS */
+				align-items: center;
+				justify-content: center;
+				overflow: hidden;
+			}
+			.guests.overflowing {
+				align-items: flex-start;
+			}
+			.guests-inner {
+				width: 100%;
+				font-family: 'Cormorant Garamond', serif;
+				font-weight: 400;
+				color: var(--ink);
+			}
+			.guests-inner.cols-2 {
+				column-count: 2;
+				column-gap: 10mm;
+			}
+			.guest {
+				break-inside: avoid;
+				-webkit-column-break-inside: avoid;
+			}
+			body.upper .guest {
+				text-transform: uppercase;
+				letter-spacing: 0.1em;
+			}
+			.guest.ghost {
+				color: var(--sage-line);
+			}
+
+			/* --- Stopka --- */
+			.foot {
+				flex: 0 0 auto;
+				font-family: 'Montserrat', sans-serif;
+				font-weight: 500;
+				text-transform: uppercase;
+				color: var(--sage-ink);
+				opacity: 0.72;
+			}
+			.foot .sep {
+				display: inline-block;
+				margin: 0 0.7em;
+				opacity: 0.6;
+			}
+
+			/* --- Przełączniki warstw pomocniczych --- */
+			body.no-frame .g-frame,
+			body.no-ruler .g-ruler {
+				display: none;
+			}
+			body.no-foot .foot {
+				visibility: hidden;
+			}
+
+			.empty-note {
+				padding: 70px 20px;
+				text-align: center;
+				font-size: 13px;
+				color: #8b9186;
+			}
+
+			/* ==========================================================
+			   DRUK
+			   ========================================================== */
+			@media print {
+				html,
+				body {
+					height: auto;
+					background: #fff;
+					display: block;
+				}
+				.controls {
+					display: none !important;
+				}
+				.stage {
+					height: auto;
+					overflow: visible;
+					padding: 0;
+				}
+				#sheets {
+					display: block;
+					zoom: 1 !important;
+					gap: 0;
+				}
+				.sheet {
+					box-shadow: none;
+					break-after: page;
+					page-break-after: always;
+				}
+				.sheet:last-child {
+					break-after: auto;
+					page-break-after: auto;
+				}
+				.guest.ghost {
+					visibility: hidden;
+				}
+			}
+		</style>
+	</head>
+
+	<body class="upper">
+		<aside class="controls">
+			<h1>Stoliki</h1>
+			<p class="subtitle">Paulina <span class="amp">&amp;</span> Bartek</p>
+
+			<div class="rule"></div>
+
+			<div class="field">
+				<label for="paper">Arkusz</label>
+				<select id="paper">
+					<option value="a4-p" selected>A4 — pionowo (210 × 297 mm)</option>
+					<option value="a4-l">A4 — poziomo (297 × 210 mm)</option>
+				</select>
+				<p class="hint">Jedna kartka = jeden stolik, do 12 gości.</p>
+			</div>
+
+			<div class="row2">
+				<div class="field">
+					<label for="label">Napis na wstędze</label>
+					<input id="label" type="text" value="Stolik" maxlength="24" />
+				</div>
+				<div class="field">
+					<label for="script">Krój napisu</label>
+					<select id="script">
+						<option value="'Pinyon Script', cursive" selected>
+							Pinyon Script
+						</option>
+						<option value="'Great Vibes', cursive">Great Vibes</option>
+						<option value="'Parisienne', cursive">Parisienne</option>
+						<option value="'Playfair Display', serif">Playfair — kursywa</option>
+					</select>
+				</div>
+			</div>
+
+			<div class="rule"></div>
+
+			<div class="field">
+				<span class="field-label">Stoliki i goście</span>
+				<div class="tables-list" id="tables"></div>
+				<div class="mini-row">
+					<button class="btn-mini" id="add-table" type="button">
+						+ Dodaj stolik
+					</button>
+					<button class="btn-mini" id="renumber" type="button">
+						Przenumeruj 1…N
+					</button>
+					<button class="btn-mini" id="clear-all" type="button">
+						Wyczyść
+					</button>
+				</div>
+				<p class="hint">
+					Jeden gość w linii. Kolejność stolików zmienisz, przeciągając za
+					uchwyt <b>⠿</b>.
+				</p>
+			</div>
+
+			<div class="field">
+				<label for="bulk">Wklej cały plan naraz</label>
+				<textarea
+					id="bulk"
+					placeholder="Stolik 1&#10;Anna Kowalska&#10;Jan Kowalski&#10;&#10;Stolik 2&#10;Maria Nowak&#10;Piotr Nowak"
+				></textarea>
+				<div class="mini-row">
+					<button class="btn-mini" id="bulk-apply" type="button">
+						Wczytaj plan
+					</button>
+					<button class="btn-mini" id="bulk-append" type="button">
+						Dopisz do istniejących
+					</button>
+				</div>
+				<p class="hint">
+					Bloki oddzielone <b>pustą linią</b>. Pierwsza linia bloku to numer
+					stolika (<code>Stolik 1</code>, <code>Stół 1</code>, samo
+					<code>1</code> albo dowolna nazwa) — reszta linii to goście. Jeśli
+					pierwsza linia wygląda na nazwisko, blok dostaje kolejny numer, a
+					wszystkie linie trafiają na listę gości.
+				</p>
+			</div>
+
+			<div class="rule"></div>
+
+			<div class="field">
+				<label for="cols">Układ listy gości</label>
+				<select id="cols">
+					<option value="auto" selected>Automatycznie</option>
+					<option value="1">Zawsze 1 kolumna</option>
+					<option value="2">Zawsze 2 kolumny</option>
+				</select>
+				<p class="hint">
+					Kartka jest wyskalowana pod <b>12 gości</b> — do tylu nazwiska idą
+					w jednej kolumnie, dużym pismem. Powyżej <b>12</b> (A4 pionowo)
+					lub <b>9</b> (poziomo) tryb automatyczny przechodzi na dwie kolumny.
+				</p>
+			</div>
+
+			<div class="field">
+				<span class="field-label">Wygląd i wydruk</span>
+				<div class="checks">
+					<label class="check"
+						><input type="checkbox" id="opt-upper" checked /> Nazwiska
+						WERSALIKAMI</label
+					>
+					<label class="check"
+						><input type="checkbox" id="opt-frame" checked /> Ozdobna ramka</label
+					>
+					<label class="check"
+						><input type="checkbox" id="opt-foot" checked /> Stopka z imionami i
+						datą</label
+					>
+					<label class="check"
+						><input type="checkbox" id="opt-ruler" /> Linijka kontrolna 100
+						mm</label
+					>
+				</div>
+			</div>
+
+			<div class="row2">
+				<div class="field">
+					<label for="foot-names">Stopka — imiona</label>
+					<input id="foot-names" type="text" value="Paulina &amp; Bartek" />
+				</div>
+				<div class="field">
+					<label for="foot-date">Stopka — data</label>
+					<input id="foot-date" type="text" value="22 sierpnia 2026" />
+				</div>
+			</div>
+
+			<div class="rule"></div>
+
+			<div class="actions">
+				<button class="btn-primary" id="btn-pdf" type="button">
+					Zapisz jako PDF
+				</button>
+				<button class="btn-ghost" id="btn-print" type="button">Drukuj</button>
+			</div>
+			<p class="saved-note" id="saved-note"></p>
+			<div class="mini-row">
+				<button class="btn-mini" id="export" type="button">
+					Eksport pliku
+				</button>
+				<button class="btn-mini" id="import-btn" type="button">
+					Import pliku
+				</button>
+				<input id="import-file" type="file" accept=".json" hidden />
+			</div>
+			<p class="hint" style="margin-top: 12px">
+				W oknie drukowania ustaw <b>marginesy: brak</b>, <b>skala: 100 %</b>
+				(nigdy „dopasuj do strony”) i włącz <b>Grafika tła</b> — bez tego wstęga
+				wydrukuje się biała.
+			</p>
+		</aside>
+
+		<main class="stage">
+			<div id="sheets"></div>
+		</main>
+
+		<script>
+			(function () {
+				'use strict';
+
+				/* ==========================================================
+				   Geometria arkusza (mm)
+				   ========================================================== */
+				const PAPERS = {
+					'a4-p': { w: 210, h: 297 },
+					'a4-l': { w: 297, h: 210 },
+				};
+
+				/* Proporcje treści zależne od orientacji. Wszystko w mm.
+				   Wyskalowane pod maks. 12 gości przy stoliku — stąd duże
+				   nazwiska i jedna kolumna. */
+				const METRICS = {
+					'a4-p': {
+						padTop: 30,
+						padBottom: 22,
+						padX: 22,
+						ribbonSpan: 184, // wstęga przez całą szerokość kartki
+						waveAmp: 3.4, // amplituda falowania
+						waveT: 0.42, // nominalna połowa grubości
+						waveBlend: 3.5, // na ilu mm kąt kreski przechodzi w falę
+						wordSize: 38, // „Stolik” — dwa razy większy
+						gapWord: 14, // od dou wstegi do GORY cyfry
+						numberSize: 56,
+						numberText: 22,
+						gapNumber: 8,
+						guestLift: 16, // o tyle skracamy pole gosci od dolu
+						nameSize: 6.5, // staly stopien nazwisk
+						nameMax: 7.0,
+						nameMin: 3.4,
+						lineH: 1.75,
+						footSize: 2.9,
+						autoCols: 12,
+					},
+					'a4-l': {
+						padTop: 20,
+						padBottom: 16,
+						padX: 26,
+						ribbonSpan: 264,
+						waveAmp: 3,
+						waveT: 0.38,
+						waveBlend: 3,
+						wordSize: 31,
+						gapWord: 9,
+						numberSize: 42,
+						numberText: 18,
+						gapNumber: 5,
+						guestLift: 10,
+						nameSize: 5.6,
+						nameMax: 6.0,
+						nameMin: 3.2,
+						lineH: 1.6,
+						footSize: 2.7,
+						autoCols: 9,
+					},
+				};
+
+				const SVG_NS = 'http://www.w3.org/2000/svg';
+				const STORE_KEY = 'slub-stoliki-v1';
+
+				/* ==========================================================
+				   Stan
+				   ========================================================== */
+				const DEFAULT_TABLES = [
+					{
+						no: '1',
+						guests: [
+							'Anna Kowalska',
+							'Jan Kowalski',
+							'Maria Nowak',
+							'Piotr Nowak',
+							'Katarzyna Wiśniewska',
+							'Tomasz Wiśniewski',
+						],
+					},
+					{ no: '2', guests: [] },
+				];
+
+				let state = {
+					paper: 'a4-p',
+					label: 'Stolik',
+					script: "'Pinyon Script', cursive",
+					cols: 'auto',
+					upper: true,
+					frame: true,
+					foot: true,
+					ruler: false,
+					footNames: 'Paulina & Bartek',
+					footDate: '22 sierpnia 2026',
+					tables: DEFAULT_TABLES.map((t) => ({
+						no: t.no,
+						guests: t.guests.slice(),
+					})),
+				};
+
+				/* ==========================================================
+				   Elementy
+				   ========================================================== */
+				const el = {};
+				[
+					'paper',
+					'label',
+					'script',
+					'cols',
+					'tables',
+					'bulk',
+					'sheets',
+					'saved-note',
+					'foot-names',
+					'foot-date',
+					'import-file',
+				].forEach((id) => (el[id] = document.getElementById(id)));
+
+				const byId = (id) => document.getElementById(id);
+
+				/* ---------- Pomiar mm → px ---------- */
+				const probe = document.createElement('div');
+				probe.style.cssText =
+					'position:absolute;visibility:hidden;width:100mm;height:0';
+				document.body.appendChild(probe);
+				const mm = () => probe.getBoundingClientRect().width / 100;
+
+				/* ==========================================================
+				   Trwałość — localStorage
+				   ========================================================== */
+				let saveTimer;
+				function save() {
+					clearTimeout(saveTimer);
+					saveTimer = setTimeout(() => {
+						try {
+							localStorage.setItem(STORE_KEY, JSON.stringify(state));
+							const t = new Date();
+							el['saved-note'].textContent =
+								'Zapisano w przeglądarce · ' +
+								String(t.getHours()).padStart(2, '0') +
+								':' +
+								String(t.getMinutes()).padStart(2, '0');
+						} catch (e) {
+							el['saved-note'].textContent = 'Nie udało się zapisać lokalnie.';
+						}
+					}, 350);
+				}
+
+				function load() {
+					let raw;
+					try {
+						raw = localStorage.getItem(STORE_KEY);
+					} catch (e) {
+						return;
+					}
+					if (!raw) return;
+					try {
+						const data = JSON.parse(raw);
+						if (data && Array.isArray(data.tables)) {
+							state = Object.assign(state, data);
+							state.tables = data.tables.map((t) => ({
+								no: String(t.no == null ? '' : t.no),
+								guests: Array.isArray(t.guests) ? t.guests.slice() : [],
+							}));
+						}
+					} catch (e) {
+						/* uszkodzony wpis — zostajemy przy domyślnym stanie */
+					}
+				}
+
+				/* ==========================================================
+				   Wektory: ramka i linijka kontrolna
+				   ========================================================== */
+				function makeLayer(P, cls) {
+					const svg = document.createElementNS(SVG_NS, 'svg');
+					svg.setAttribute('class', 'layer ' + cls);
+					svg.setAttribute('width', P.w + 'mm');
+					svg.setAttribute('height', P.h + 'mm');
+					svg.setAttribute('viewBox', '0 0 ' + P.w + ' ' + P.h);
+					svg.setAttribute('preserveAspectRatio', 'none');
+					return svg;
+				}
+
+				function rect(parent, x, y, w, h, attrs) {
+					const r = document.createElementNS(SVG_NS, 'rect');
+					r.setAttribute('x', x);
+					r.setAttribute('y', y);
+					r.setAttribute('width', w);
+					r.setAttribute('height', h);
+					Object.keys(attrs).forEach((k) => r.setAttribute(k, attrs[k]));
+					parent.appendChild(r);
+					return r;
+				}
+
+				function line(parent, x1, y1, x2, y2) {
+					const l = document.createElementNS(SVG_NS, 'line');
+					l.setAttribute('x1', x1);
+					l.setAttribute('y1', y1);
+					l.setAttribute('x2', x2);
+					l.setAttribute('y2', y2);
+					parent.appendChild(l);
+					return l;
+				}
+
+				function group(parent, cls, attrs) {
+					const g = document.createElementNS(SVG_NS, 'g');
+					if (cls) g.setAttribute('class', cls);
+					Object.keys(attrs || {}).forEach((k) => g.setAttribute(k, attrs[k]));
+					parent.appendChild(g);
+					return g;
+				}
+
+				/* Podwójna szałwiowa ramka + linijka kontrolna 100 mm */
+				function buildGuides(P) {
+					const svg = makeLayer(P, 'guides');
+
+					const gFrame = group(svg, 'g-frame', {
+						fill: 'none',
+						stroke: '#C6CBC1',
+					});
+					rect(gFrame, 10, 10, P.w - 20, P.h - 20, {
+						rx: 2.5,
+						'stroke-width': '0.4',
+					});
+					rect(gFrame, 12, 12, P.w - 24, P.h - 24, {
+						rx: 1.8,
+						'stroke-width': '0.22',
+						'stroke-opacity': '0.7',
+					});
+
+					const gRuler = group(svg, 'g-ruler', {
+						stroke: '#b6bbb0',
+						'stroke-width': '0.25',
+						fill: '#b6bbb0',
+					});
+					const rx = 4.2;
+					const len = 100;
+					const y0 = (P.h - len) / 2;
+					line(gRuler, rx, y0, rx, y0 + len);
+					line(gRuler, rx - 1.4, y0, rx + 1.4, y0);
+					line(gRuler, rx - 1.4, y0 + len, rx + 1.4, y0 + len);
+					const t = document.createElementNS(SVG_NS, 'text');
+					t.setAttribute('x', rx + 2);
+					t.setAttribute('y', y0 + len / 2);
+					t.setAttribute(
+						'transform',
+						'rotate(-90 ' + (rx + 2) + ' ' + (y0 + len / 2) + ')'
+					);
+					t.setAttribute('text-anchor', 'middle');
+					t.setAttribute('font-size', '2.6');
+					t.setAttribute('font-family', 'Montserrat, sans-serif');
+					t.setAttribute('stroke', 'none');
+					t.textContent = 'kontrola skali — zmierz: 100 mm';
+					gRuler.appendChild(t);
+
+					return svg;
+				}
+
+				/* ==========================================================
+				   Wstęga — pofalowana linia przez CAŁĄ szerokość kartki.
+
+				   Ma być PRZEDŁUŻENIEM pisma, nie doczepką: zaczyna się
+				   dokładnie w zakończeniu laski „S” (i „k”), wybiega pod tym
+				   samym kątem i z tą samą grubością co kreska, a dopiero
+				   potem przechodzi w falę. Font nie udostępnia położenia
+				   zakończeń, więc wykrywamy je z rastra glifów.
+				   ========================================================== */
+				const RIBBON_INK = '#3E4A38';
+				const TERM_SS = 3; /* nadpróbkowanie rastra przy pomiarze */
+
+				/* Kanwa rysuje krojem zastępczym, dopóki właściwy się nie wczyta.
+				   Pomiar zakończeń byłby wtedy z zupełnie innego pisma — a że
+				   wynik trafia do cache'u, zostałby z nami na stałe, mimo że DOM
+				   przerysuje się już poprawnie. Dlatego przed pomiarem sprawdzamy
+				   krój, a przy jego braku wynik odrzucamy bez zapisu i planujemy
+				   ponowny render. */
+				let termPending = false;
+
+				function scriptLoaded(sizePx) {
+					if (!document.fonts || !document.fonts.check) return true;
+					/* bez rodziny zastępczej — z nią check() zawsze zwraca prawdę */
+					const fam = state.script.split(',')[0].trim();
+					const it = state.script.indexOf('Playfair') !== -1 ? 'italic ' : '';
+					try {
+						return document.fonts.check(it + sizePx + 'px ' + fam);
+					} catch (e) {
+						return true;
+					}
+				}
+
+				function canvasFont(sizePx) {
+					const it = state.script.indexOf('Playfair') !== -1 ? 'italic ' : '';
+					return it + sizePx + 'px ' + state.script;
+				}
+
+				/* Raster wyrazu. Współrzędne liczymy od początku pisma (ox)
+				   i linii bazowej (oy), bo tylko te dwa punkty umiemy potem
+				   odnaleźć w DOM-ie. */
+				function rasterWord(text, sizePx) {
+					const ss = TERM_SS;
+					const s = sizePx * ss;
+					const probe = document.createElement('canvas').getContext('2d');
+					probe.font = canvasFont(s);
+					const adv = probe.measureText(text).width;
+					if (!adv) return null;
+
+					const padX = Math.ceil(s * 1.3);
+					const padT = Math.ceil(s * 1.8);
+					const padB = Math.ceil(s * 1.4);
+
+					const cv = document.createElement('canvas');
+					cv.width = Math.ceil(adv) + padX * 2;
+					cv.height = padT + padB;
+					const ctx = cv.getContext('2d', { willReadFrequently: true });
+					ctx.font = canvasFont(s);
+					ctx.textBaseline = 'alphabetic';
+					ctx.fillStyle = '#000';
+					ctx.fillText(text, padX, padT);
+
+					const px = ctx.getImageData(0, 0, cv.width, cv.height).data;
+					const ink = new Uint8Array(cv.width * cv.height);
+					let minX = cv.width;
+					let maxX = -1;
+					/* Próg wysoki celowo: końcówki krojów kaligraficznych wygasają
+					   w niemal niewidoczny włos, którego na wydruku nie widać —
+					   gdyby liczył się jako kreska, wstęga zaczepiałaby się
+					   w pustce obok litery. */
+					for (let i = 0, a = 3; i < ink.length; i++, a += 4) {
+						if (px[a] > 140) {
+							ink[i] = 1;
+							const x = i % cv.width;
+							if (x < minX) minX = x;
+							if (x > maxX) maxX = x;
+						}
+					}
+					if (maxX < 0) return null;
+					return {
+						ink: ink,
+						W: cv.width,
+						H: cv.height,
+						ss: ss,
+						ox: padX,
+						oy: padT,
+						minX: minX,
+						maxX: maxX,
+						em: s,
+					};
+				}
+
+				/* Odczyt piksela rastra */
+				function inkAt(R, x, y) {
+					const ix = Math.round(x);
+					const iy = Math.round(y);
+					return ix < 0 || iy < 0 || ix >= R.W || iy >= R.H
+						? 0
+						: R.ink[iy * R.W + ix];
+				}
+
+				/* Czubek kreski: piksel, wokół którego tusz leży tylko po jednej
+				   stronie. W środku kreski rozkłada się symetrycznie, na końcu —
+				   przesuwa w głąb litery, co daje nam zarazem kierunek. */
+				function findTip(R, left) {
+					const rad = Math.max(3, Math.round(R.ss * 4.5));
+					const r2 = rad * rad;
+					const band = Math.round((R.maxX - R.minX) * 0.45);
+					const from = left ? R.minX : R.maxX;
+					const step = left ? 1 : -1;
+
+					/* Zakończenie, którego szukamy, leży przy linii pisma. Skan
+					   kolumny idzie od góry, więc bez tego warunku dla „k”
+					   trafialiśmy w czubek laski i całe ramię startowało wysoko
+					   nad wyrazem. R.oy to dokładnie linia bazowa rastra. */
+					const nearLimit = R.em * 0.45;
+
+					const cands = [];
+					let seenNear = 0;
+
+					for (let k = 0; k <= band; k++) {
+						const x = from + step * k;
+						for (let y = 0; y < R.H; y++) {
+							if (!inkAt(R, x, y)) continue;
+
+							let cnt = 0;
+							let sx = 0;
+							let sy = 0;
+							for (let dy = -rad; dy <= rad; dy++) {
+								for (let dx = -rad; dx <= rad; dx++) {
+									if (dx * dx + dy * dy > r2) continue;
+									if (inkAt(R, x + dx, y + dy)) {
+										cnt++;
+										sx += dx;
+										sy += dy;
+									}
+								}
+							}
+							if (!cnt) continue;
+
+							const cx = sx / cnt;
+							const cy = sy / cnt;
+							const len = Math.sqrt(cx * cx + cy * cy);
+							if (len / rad < 0.26) continue; /* to środek kreski */
+
+							const dx = cx / len;
+							const dy = cy / len;
+							/* kreska musi biec w głąb wyrazu */
+							if (left ? dx < 0.15 : dx > -0.15) continue;
+
+							const dist = Math.abs(y - R.oy);
+							cands.push({ x: x, y: y, dx: dx, dy: dy, dist: dist });
+							if (dist <= nearLimit) seenNear++;
+						}
+						/* mamy już zakończenie przy linii pisma — dobierzmy jeszcze
+						   kilka kolumn i kończmy, żeby nie skanować całego wyrazu */
+						if (seenNear && k > 8) break;
+					}
+
+					if (!cands.length) return null;
+
+					const near = cands.filter((c) => c.dist <= nearLimit);
+					const pool = near.length ? near : cands;
+					/* spośród nich bierzemy najbardziej wysunięte na zewnątrz */
+					pool.sort((a, b) => (left ? a.x - b.x : b.x - a.x));
+					return pool[0];
+				}
+
+				/* Analiza zakończenia: od czubka idziemy w głąb litery KOLUMNA
+				   PO KOLUMNIE i śledzimy pionowy przebieg tuszu — jego środek
+				   i grubość. To rozwiązuje dwa problemy naraz:
+
+				   1. Kroje kaligraficzne kończą włos ozdobną KULKĄ (Pinyon: „S”
+				      i „k”). Kierunek liczony z rozkładu tuszu na kulce to szum —
+				      kulka nie ma kierunku — i ramię nurkowało do niej hakiem.
+				      Środek kreski śledzony przez kulkę biegnie przez jej środek
+				      i daje nachylenie ~0, a kotwica w najgrubszym miejscu to
+				      dokładnie środek kulki: wstęga wychodzi z niej jak z koralika.
+				   2. Przy zwykłym włosku najgrubsze miejsce wypada przy czubku,
+				      a dopasowanie liniowe środków daje prawdziwą styczną kreski.
+				   */
+				function analyzeTerminal(R, tip, left) {
+					const stepX = left ? 1 : -1;
+					const maxScan = Math.max(6, Math.round(R.em * 0.08));
+					const cols = [];
+					let prevMid = tip.y;
+
+					for (let i = 0; i < maxScan; i++) {
+						const x = tip.x + stepX * i;
+						if (x < 0 || x >= R.W) break;
+
+						/* pionowy przebieg tuszu najbliższy poprzedniemu środkowi */
+						let best = null;
+						let y = 0;
+						while (y < R.H) {
+							if (R.ink[y * R.W + x]) {
+								let y2 = y;
+								while (y2 + 1 < R.H && R.ink[(y2 + 1) * R.W + x]) y2++;
+								const mid = (y + y2) / 2;
+								if (!best || Math.abs(mid - prevMid) < Math.abs(best.mid - prevMid)) {
+									best = { mid: mid, half: (y2 - y + 1) / 2 };
+								}
+								y = y2 + 1;
+							} else {
+								y++;
+							}
+						}
+						if (!best) break;
+						/* zgubiliśmy kreskę albo wjechaliśmy w korpus litery */
+						if (i > 0 && Math.abs(best.mid - prevMid) > R.ss * 4) break;
+						if (
+							cols.length > 2 &&
+							best.half > cols[cols.length - 1].half * 2.5
+						) {
+							break;
+						}
+
+						cols.push({ x: x, mid: best.mid, half: best.half });
+						prevMid = best.mid;
+
+						/* kulka minięta (grubość wyraźnie spadła po maksimum) */
+						if (cols.length >= 4) {
+							const h = cols.map((c) => c.half);
+							const mx = Math.max.apply(null, h);
+							if (
+								mx > h[0] * 1.6 &&
+								h[h.length - 1] < mx * 0.8 &&
+								h[h.length - 2] < mx * 0.85
+							) {
+								break;
+							}
+						}
+					}
+
+					if (!cols.length) {
+						return { x: tip.x, y: tip.y, m0: 0, half: 1 };
+					}
+
+					/* kotwica: najgrubsze miejsce (środek kulki); przy czystym
+					   włosku maksimum wypada przy czubku */
+					let ai = 0;
+					for (let i = 1; i < cols.length; i++) {
+						if (cols[i].half > cols[ai].half + 0.5) ai = i;
+					}
+					const a = cols[ai];
+
+					/* Nachylenie środka kreski — dopasowanie liniowe mid(x).
+					   Tylko zewnętrzna połowa kolumn: ogonek się zakrzywia i fit
+					   po całym oknie dawałby kąt uśredniony, nie ten w styku. */
+					let m0 = 0;
+					const fitCols = cols.slice(
+						0,
+						Math.max(3, Math.ceil(cols.length / 2))
+					);
+					if (fitCols.length >= 3) {
+						let sx = 0;
+						let sy = 0;
+						let sxx = 0;
+						let sxy = 0;
+						fitCols.forEach((c) => {
+							sx += c.x;
+							sy += c.mid;
+							sxx += c.x * c.x;
+							sxy += c.x * c.mid;
+						});
+						const nn = fitCols.length;
+						const den = nn * sxx - sx * sx;
+						if (den) m0 = (nn * sxy - sx * sy) / den;
+					}
+
+					/* Jak daleko od kotwicy, idąc STYCZNĄ w głąb litery, sięga
+					   tusz. Szpic wstęgi chowamy dokładnie na tym odcinku — stały
+					   naddatek wystawał z prześwitu za kulką albo za zakrętem
+					   ogonka jako mały dzióbek. */
+					let ovPx = 0;
+					while (ovPx < R.em * 0.06) {
+						const px2 = a.x + stepX * (ovPx + 1);
+						const py2 = a.mid + m0 * stepX * (ovPx + 1);
+						if (!inkAt(R, px2, Math.round(py2))) break;
+						ovPx++;
+					}
+
+					return { x: a.x, y: a.mid, m0: m0, half: a.half, ovPx: ovPx };
+				}
+
+				/* Pomiar zależy tylko od kroju, stopnia i treści napisu — jest
+				   ten sam dla wszystkich kartek, więc liczymy go raz. */
+				let termCache = { key: null, val: null };
+
+				function terminals(text, sizePx) {
+					const key = state.script + '|' + sizePx + '|' + text;
+					if (termCache.key === key) return termCache.val;
+
+					if (!scriptLoaded(sizePx)) {
+						if (document.fonts && document.fonts.ready && !termPending) {
+							termPending = true;
+							document.fonts.ready.then(function () {
+								termPending = false;
+								renderSheets();
+							});
+						}
+						return null;
+					}
+
+					const R = rasterWord(text, sizePx);
+					let val = null;
+					if (R) {
+						const side = (left) => {
+							const tip = findTip(R, left);
+							return tip ? analyzeTerminal(R, tip, left) : null;
+						};
+						val = {
+							ox: R.ox,
+							oy: R.oy,
+							ss: R.ss,
+							minX: R.minX,
+							maxX: R.maxX,
+							left: side(true),
+							right: side(false),
+						};
+					}
+					termCache = { key: key, val: val };
+					return val;
+				}
+
+				/* Jedno ramię wstęgi: od zakończenia litery do krawędzi kartki.
+				   Wszystko w milimetrach układu wstęgi. */
+				function armPath(x0, y0, yRef, toX, m0, h0, ov, M) {
+					const L = Math.abs(toX - x0);
+					if (L < 5) return '';
+					const sgn = toX > x0 ? 1 : -1;
+					const N = Math.max(140, Math.round(L * 4));
+					const uo = ov / L;
+					const up = [];
+					const dn = [];
+
+					for (let i = 0; i <= N; i++) {
+						const u = -uo + (i / N) * (1 + uo);
+						const sMm = sgn * u * L; /* przesunięcie w poziomie od styku */
+						const x = x0 + sMm;
+						const uc = Math.max(0, u);
+
+						/* Fala wygaszona przy literze — o kierunku startu decyduje
+						   wyłącznie nachylenie kreski, nie fala. */
+						const wr = Math.min(1, uc / 0.2);
+						const win = wr * wr * (3 - 2 * wr);
+						const wave = M.waveAmp * Math.sin(2 * Math.PI * uc) * win;
+
+						/* Nachylenie kreski przedłużamy i wygaszamy wykładniczo,
+						   więc wstęga wychodzi z litery jej własnym torem
+						   i dopiero po kilku milimetrach wchodzi w falę. */
+						const blend = m0 * sMm * Math.exp(-Math.abs(sMm) / M.waveBlend);
+
+						/* Zakończenia „S” i „k” leżą na różnych wysokościach —
+						   gdyby każde ramię zostało na swojej, wstęga wyszłaby
+						   przechylona. Startujemy więc dokładnie w literze,
+						   a dalej ramię schodzi na wspólną linię pisma, wokół
+						   której fala jest już symetryczna. */
+						const st = Math.min(1, uc / 0.35);
+						const settle = st * st * (3 - 2 * st);
+						const base = yRef + (y0 - yRef) * (1 - settle);
+
+						const y = base + wave + blend;
+
+						/* Grubość startuje dokładnie na grubości kreski w literze,
+						   przechodzi w nominalną i zbiega do włoska na krawędzi. */
+						/* Profil jak w piśmie ręcznym: przy literze włos o grubości
+						   tamtejszej kreski, zgrubienie mniej więcej w 2/5 długości
+						   ramienia, znów włos na krawędzi kartki. */
+						let th = M.waveT * Math.sin(Math.PI * Math.pow(uc, 0.85)) +
+							h0 * (1 - uc);
+
+						/* Odcinek wsunięty w literę schodzi do szpica — inaczej
+						   w miejscu startu ramienia widać tępe ścięcie wystające
+						   spod glifu. */
+						if (u < 0) {
+							const q = 1 + u / uo;
+							th *= q * q * (3 - 2 * q);
+						}
+
+						up.push(x.toFixed(3) + ',' + (y - th).toFixed(3));
+						dn.push(x.toFixed(3) + ',' + (y + th).toFixed(3));
+					}
+					return 'M' + up.join('L') + 'L' + dn.reverse().join('L') + 'Z';
+				}
+
+				/* Wstęgę składamy po złożeniu wiersza — dopiero wtedy znamy
+				   położenie wyrazu i linii pisma. */
+				function layoutRibbon(ribbon, M) {
+					const word = ribbon.querySelector('.ribbon-word');
+					const svg = ribbon.querySelector('.ribbon-lines');
+					if (!word || !svg) return;
+
+					const px = mm();
+					const rRect = ribbon.getBoundingClientRect();
+					const wRect = word.getBoundingClientRect();
+
+					const strut = document.createElement('span');
+					strut.style.cssText =
+						'display:inline-block;width:0;height:0;vertical-align:baseline;';
+					word.appendChild(strut);
+					const baseY = strut.getBoundingClientRect().top;
+					strut.remove();
+
+					const span = M.ribbonSpan;
+					const padV = M.waveAmp + 3;
+					const hMm = rRect.height / px + padV * 2;
+
+					svg.setAttribute('width', span + 'mm');
+					svg.setAttribute('height', hMm + 'mm');
+					svg.setAttribute('viewBox', '0 0 ' + span + ' ' + hMm);
+					svg.style.top = -padV + 'mm';
+
+					const sizePx = parseFloat(getComputedStyle(word).fontSize);
+					const T = terminals(word.textContent, sizePx);
+
+					let d = '';
+					[true, false].forEach((left) => {
+						const t = T && (left ? T.left : T.right);
+						let X;
+						let Y;
+						let m0;
+						let h0;
+
+						let ov = 0.35;
+						if (t) {
+							X = wRect.left + (t.x - T.ox) / T.ss;
+							Y = baseY + (t.y - T.oy) / T.ss;
+							m0 = t.m0;
+							h0 = t.half / T.ss / px;
+							/* 85% zmierzonego zasięgu tuszu — szpic kończy się
+							   jeszcze pod kreską litery */
+							ov = Math.max(
+								0.25,
+								Math.min(0.85, ((t.ovPx / T.ss) * 0.85) / px)
+							);
+						} else {
+							/* awaryjnie: linia pisma przy krawędzi wyrazu, poziomo */
+							X = left ? wRect.left : wRect.right;
+							Y = baseY;
+							m0 = 0;
+							h0 = M.waveT;
+						}
+
+						/* Strome zakończenie przeniosłoby całe ramię w górę lub w dół
+						   i wstęga wyszłaby krzywo — bierzemy z litery kierunek startu,
+						   nie przechył całej fali. */
+						m0 = Math.max(-1.0, Math.min(1.0, m0));
+						/* Start dokładnie w grubości kreski litery w miejscu styku.
+						   Bez górnego ograniczenia: „S” zaczyna się KULKĄ i jeśli
+						   wstęga dochodzi do niej cieńsza, kulka wystaje górą i dołem
+						   jak koralik nadziany na koniec linii. Zrównana z promieniem
+						   kulki tworzy z nią jeden ciągły kontur, a dalej naturalnie
+						   ścienia się do właściwej wstęgi. */
+						h0 = Math.max(M.waveT * 0.25, Math.min(M.waveT * 2.5, h0));
+
+						d += armPath(
+							(X - rRect.left) / px,
+							(Y - rRect.top) / px + padV,
+							(baseY - rRect.top) / px + padV,
+							left ? 0 : span,
+							m0,
+							h0,
+							ov,
+							M
+						);
+					});
+
+					while (svg.firstChild) svg.removeChild(svg.firstChild);
+					const p = document.createElementNS(SVG_NS, 'path');
+					p.setAttribute('d', d);
+					p.setAttribute('fill', RIBBON_INK);
+					svg.appendChild(p);
+				}
+
+				/* ==========================================================
+				   Budowa jednej kartki
+				   ========================================================== */
+				function buildSheet(table, P, M) {
+					const sheet = document.createElement('div');
+					sheet.className = 'sheet';
+					sheet.style.width = P.w + 'mm';
+					sheet.style.height = P.h + 'mm';
+
+					const content = document.createElement('div');
+					content.className = 'content';
+					content.style.padding =
+						M.padTop + 'mm ' + M.padX + 'mm ' + M.padBottom + 'mm';
+
+					/* --- Wstążka: „Stolik” z kaligraficznym przedłużeniem --- */
+					const ribbon = document.createElement('div');
+					ribbon.className = 'ribbon';
+					ribbon.style.width = M.ribbonSpan + 'mm';
+					/* marginBottom ustawiamy nizej — zalezy od tego, czy pod
+					   wstega stoi cyfra, czy dluzsza nazwa stolika */
+
+					/* rysunek wstęgi dorysuje layoutRibbon, gdy znane będzie
+					   położenie zakończeń liter */
+					const lines = document.createElementNS(SVG_NS, 'svg');
+					lines.setAttribute('class', 'ribbon-lines');
+					lines.setAttribute('aria-hidden', 'true');
+
+					const word = document.createElement('span');
+					word.className = 'ribbon-word';
+					word.style.fontFamily = state.script;
+					const isPlayfair = state.script.indexOf('Playfair') !== -1;
+					word.style.fontSize =
+						(isPlayfair ? M.wordSize * 0.72 : M.wordSize) + 'mm';
+					if (isPlayfair) word.style.fontStyle = 'italic';
+					word.textContent = state.label || 'Stolik';
+
+					ribbon.append(lines, word);
+
+					/* --- Numer / nazwa --- */
+					const no = String(table.no || '').trim();
+					const number = document.createElement('div');
+					number.className = 'number';
+					const isShort = no.length <= 3;
+					number.style.fontSize =
+						(isShort ? M.numberSize : M.numberText) + 'mm';
+					if (!isShort) number.classList.add('is-text');
+					number.textContent = no || '—';
+					number.style.marginBottom = M.gapNumber + 'mm';
+
+					/* Nad cyfra zostaje pusta gorna czesc pola wiersza (w Playfair
+					   ok. 0,34 firetu). Przy duzym numerze to juz dwa centymetry
+					   powietrza, wiec odejmujemy je od odstepu — dzieki temu
+					   gapWord znaczy realna odleglosc od wstegi do tuszu cyfry.
+					   Przy dluzszej nazwie pole wiersza jest niskie i korekta
+					   nie jest potrzebna. */
+					ribbon.style.marginBottom =
+						(isShort ? M.gapWord - M.numberSize * 0.34 : M.gapWord) + 'mm';
+
+					/* --- Goście --- */
+					const guests = document.createElement('div');
+					guests.className = 'guests';
+
+					const inner = document.createElement('div');
+					inner.className = 'guests-inner';
+
+					const list = (table.guests || [])
+						.map((g) => String(g).trim())
+						.filter(Boolean);
+
+					const twoCols =
+						state.cols === '2' ||
+						(state.cols === 'auto' && list.length > M.autoCols);
+					if (twoCols) inner.classList.add('cols-2');
+
+					if (list.length) {
+						list.forEach((g) => {
+							const d = document.createElement('div');
+							d.className = 'guest';
+							d.textContent = g;
+							inner.appendChild(d);
+						});
+					} else {
+						const d = document.createElement('div');
+						d.className = 'guest ghost';
+						d.textContent = 'lista gości';
+						inner.appendChild(d);
+					}
+					guests.appendChild(inner);
+
+					/* --- Stopka --- */
+					const foot = document.createElement('div');
+					foot.className = 'foot';
+					foot.style.fontSize = M.footSize + 'mm';
+					foot.style.letterSpacing = '0.22em';
+					foot.style.marginTop = '6mm';
+					foot.innerHTML =
+						escapeHtml(state.footNames) +
+						'<span class="sep">·</span>' +
+						escapeHtml(state.footDate);
+
+					content.append(ribbon, number, guests, foot);
+					sheet.appendChild(content);
+					sheet.appendChild(buildGuides(P));
+					return sheet;
+				}
+
+				function escapeHtml(s) {
+					return String(s == null ? '' : s).replace(
+						/[&<>"']/g,
+						(c) =>
+							({
+								'&': '&amp;',
+								'<': '&lt;',
+								'>': '&gt;',
+								'"': '&quot;',
+								"'": '&#39;',
+							}[c])
+					);
+				}
+
+				/* ==========================================================
+				   Dopasowanie listy gości do wysokości
+				   ========================================================== */
+				const COL_GAP = 10; /* mm — zgodne z .guests-inner.cols-2 */
+
+				/* Największy stopień pisma, przy którym najdłuższe nazwisko mieści się
+				   w kolumnie bez łamania. Mierzone probem w tej samej typografii
+				   (klasa .guest niesie wersaliki i światło międzyliterowe). */
+				function sizeByWidth(inner, M) {
+					const REF = 10; /* mm — stopień odniesienia pomiaru */
+					const prev = inner.style.fontSize;
+					inner.style.fontSize = REF + 'mm';
+
+					const probe = document.createElement('div');
+					probe.className = 'guest';
+					probe.style.cssText =
+						'position:absolute;left:-10000px;top:0;white-space:nowrap;visibility:hidden;';
+					inner.appendChild(probe);
+
+					let widest = 0;
+					inner.querySelectorAll('.guest').forEach((g) => {
+						if (g === probe) return;
+						probe.textContent = g.textContent;
+						widest = Math.max(widest, probe.getBoundingClientRect().width);
+					});
+					probe.remove();
+					inner.style.fontSize = prev;
+
+					if (!widest) return M.nameMax;
+
+					const colW = inner.classList.contains('cols-2')
+						? (inner.clientWidth - COL_GAP * mm()) / 2
+						: inner.clientWidth;
+
+					/* Przy naprawdę długich nazwiskach wolimy zawinięcie
+					   niż nieczytelnie drobne pismo — stąd dolna zapora. */
+					return Math.max((REF * colW) / widest, M.nameMin + 0.8);
+				}
+
+				function fitGuests(guestsBox, M) {
+					const inner = guestsBox.querySelector('.guests-inner');
+					if (!inner) return;
+
+					const step = 0.1;
+					const maxH = guestsBox.clientHeight;
+
+					/* Stopień pisma jest STAŁY — karty wiszą na tablicy obok
+					   siebie i różne wielkości nazwisk od razu rzucają się
+					   w oczy. Liczba osób go nie zmienia; schodzimy niżej
+					   dopiero wtedy, gdy lista fizycznie nie mieści się na
+					   kartce albo gdy nazwisko nie weszłoby w kolumnę bez
+					   zawinięcia. */
+					let size = Math.min(M.nameSize, sizeByWidth(inner, M));
+					size = Math.round(size * 100) / 100;
+
+					inner.style.fontSize = size + 'mm';
+					inner.style.lineHeight = M.lineH;
+
+					/* najpierw zmniejszamy stopień pisma… */
+					while (inner.scrollHeight > maxH && size > M.nameMin) {
+						size = Math.round((size - step) * 100) / 100;
+						inner.style.fontSize = size + 'mm';
+					}
+
+					/* …a gdy to nie starcza, ściskamy interlinię */
+					let lh = M.lineH;
+					while (inner.scrollHeight > maxH && lh > 1.25) {
+						lh = Math.round((lh - 0.05) * 100) / 100;
+						inner.style.lineHeight = lh;
+					}
+
+					/* ostatnia deska ratunku — druga kolumna */
+					if (
+						inner.scrollHeight > maxH &&
+						state.cols === 'auto' &&
+						!inner.classList.contains('cols-2')
+					) {
+						inner.classList.add('cols-2');
+						inner.style.fontSize = M.nameSize + 'mm';
+						inner.style.lineHeight = M.lineH;
+						fitGuests(guestsBox, M);
+						return;
+					}
+
+					/* Gdy mimo wszystko nie mieści się (bardzo długa lista), lepiej
+					   przyciąć dół niż symetrycznie obciąć górę i dół. */
+					guestsBox.classList.toggle(
+						'overflowing',
+						inner.scrollHeight > maxH + 1
+					);
+
+					/* Lista jest wyśrodkowana w wolnym polu. Podnosimy ją
+					   o guestLift, ale tylko tak daleko, jak sięga zapas nad
+					   nią — inaczej długa lista wyjechałaby górą poza pole.
+					   Robimy to przesunięciem, a nie skróceniem pola, żeby nie
+					   odbierać wysokości potrzebnej na pełny stopień pisma. */
+					const slack = (maxH - inner.scrollHeight) / 2;
+					const lift = Math.max(
+						0,
+						Math.min((M.guestLift || 0) * mm(), slack)
+					);
+					inner.style.transform = lift
+						? 'translateY(' + -lift + 'px)'
+						: '';
+				}
+
+				/* ==========================================================
+				   Render podglądu
+				   ========================================================== */
+				function renderSheets() {
+					const P = PAPERS[state.paper];
+					const M = METRICS[state.paper];
+
+					byId('page-style').textContent =
+						'@page { size: ' + P.w + 'mm ' + P.h + 'mm; margin: 0; }';
+
+					el.sheets.innerHTML = '';
+					/* mierzymy przy skali 1:1 — zoom podglądu nakładamy dopiero po
+					   dopasowaniu list, żeby nie zakłócał odczytów wysokości */
+					el.sheets.style.zoom = 1;
+
+					if (!state.tables.length) {
+						const note = document.createElement('p');
+						note.className = 'empty-note';
+						note.textContent =
+							'Brak stolików. Dodaj pierwszy albo wklej cały plan.';
+						el.sheets.appendChild(note);
+						return;
+					}
+
+					state.tables.forEach((t) => {
+						el.sheets.appendChild(buildSheet(t, P, M));
+					});
+
+					el.sheets
+						.querySelectorAll('.ribbon')
+						.forEach((r) => layoutRibbon(r, M));
+
+					el.sheets
+						.querySelectorAll('.guests')
+						.forEach((box) => fitGuests(box, M));
+
+					applyZoom(P);
+				}
+
+				function applyZoom(P) {
+					const stage = document.querySelector('.stage');
+					const available = stage.clientWidth - 48;
+					const sheetPx = P.w * mm();
+					el.sheets.style.zoom = Math.min(1, available / sheetPx);
+				}
+
+				/* ==========================================================
+				   Edytor stolików
+				   ========================================================== */
+				let dragFrom = null;
+
+				function renderEditor() {
+					el.tables.innerHTML = '';
+
+					state.tables.forEach((t, i) => {
+						const card = document.createElement('div');
+						card.className = 'table-card';
+						card.dataset.i = i;
+
+						const head = document.createElement('div');
+						head.className = 'tc-head';
+
+						const grip = document.createElement('span');
+						grip.className = 'tc-grip';
+						grip.textContent = '⠿';
+						grip.title = 'Przeciągnij, aby zmienić kolejność';
+						grip.draggable = true;
+						grip.addEventListener('dragstart', (e) => {
+							dragFrom = i;
+							card.classList.add('is-dragging');
+							e.dataTransfer.effectAllowed = 'move';
+							/* Firefox wymaga jakichkolwiek danych, żeby drag wystartował */
+							e.dataTransfer.setData('text/plain', String(i));
+						});
+						grip.addEventListener('dragend', () => {
+							dragFrom = null;
+							card.classList.remove('is-dragging');
+						});
+
+						const noInput = document.createElement('input');
+						noInput.type = 'text';
+						noInput.value = t.no;
+						noInput.placeholder = 'Numer lub nazwa';
+						noInput.addEventListener('input', () => {
+							t.no = noInput.value;
+							save();
+							renderSheets();
+						});
+
+						const count = document.createElement('span');
+						count.className = 'tc-count';
+
+						const del = document.createElement('button');
+						del.className = 'tc-del';
+						del.type = 'button';
+						del.textContent = '×';
+						del.title = 'Usuń stolik';
+						del.addEventListener('click', () => {
+							state.tables.splice(i, 1);
+							save();
+							renderEditor();
+							renderSheets();
+						});
+
+						head.append(grip, noInput, count, del);
+
+						const ta = document.createElement('textarea');
+						ta.value = (t.guests || []).join('\n');
+						ta.placeholder = 'Anna Kowalska\nJan Kowalski';
+						ta.spellcheck = false;
+
+						const warn = document.createElement('p');
+						warn.className = 'tc-warn';
+
+						const refreshMeta = () => {
+							const n = (t.guests || []).filter((g) =>
+								String(g).trim()
+							).length;
+							count.textContent = n + (n === 1 ? ' os.' : ' os.');
+							const limit = state.paper === 'a4-p' ? 12 : 9;
+							warn.textContent =
+								n > limit
+									? 'Powyżej ' +
+									  limit +
+									  ' osób lista przechodzi na dwie kolumny i drobniejsze pismo.'
+									: '';
+						};
+
+						ta.addEventListener('input', () => {
+							t.guests = ta.value.split('\n').map((s) => s.replace(/\s+$/, ''));
+							refreshMeta();
+							save();
+							renderSheets();
+						});
+
+						refreshMeta();
+
+						/* Upuszczenie na kartę = przeniesienie stolika w to miejsce */
+						card.addEventListener('dragover', (e) => {
+							if (dragFrom === null || dragFrom === i) return;
+							e.preventDefault();
+							e.dataTransfer.dropEffect = 'move';
+							card.classList.add('is-over');
+						});
+						card.addEventListener('dragleave', () =>
+							card.classList.remove('is-over')
+						);
+						card.addEventListener('drop', (e) => {
+							e.preventDefault();
+							card.classList.remove('is-over');
+							if (dragFrom === null || dragFrom === i) return;
+							const moved = state.tables.splice(dragFrom, 1)[0];
+							state.tables.splice(i, 0, moved);
+							dragFrom = null;
+							save();
+							renderEditor();
+							renderSheets();
+						});
+
+						card.append(head, ta, warn);
+						el.tables.appendChild(card);
+					});
+				}
+
+				/* ==========================================================
+				   Import zbiorczy
+				   ========================================================== */
+				const HEADER_RE = /^(?:stolik|stol|stó[łl]|table)\s*[:.\-–]?\s*(.*)$/i;
+
+				function parseBulk(text, startNo) {
+					const blocks = text
+						.split(/\n\s*\n+/)
+						.map((b) => b.trim())
+						.filter(Boolean);
+
+					const out = [];
+					blocks.forEach((block, bi) => {
+						const lines = block
+							.split('\n')
+							.map((s) => s.trim())
+							.filter(Boolean);
+						if (!lines.length) return;
+
+						let no = null;
+						const first = lines[0];
+						const m = first.match(HEADER_RE);
+
+						if (m) {
+							no = (m[1] || '').trim() || String(startNo + bi);
+							lines.shift();
+						} else if (/^[0-9]{1,3}[a-zA-Z]?[.)]?$/.test(first)) {
+							no = first.replace(/[.)]$/, '');
+							lines.shift();
+						} else {
+							/* pierwsza linia wygląda na nazwisko — cały blok to goście */
+							no = String(startNo + bi);
+						}
+
+						out.push({ no: no, guests: lines });
+					});
+					return out;
+				}
+
+				function applyBulk(append) {
+					const text = el.bulk.value;
+					if (!text.trim()) return;
+					const startNo = append ? state.tables.length + 1 : 1;
+					const parsed = parseBulk(text, startNo);
+					if (!parsed.length) return;
+
+					state.tables = append ? state.tables.concat(parsed) : parsed;
+					save();
+					renderEditor();
+					renderSheets();
+				}
+
+				/* ==========================================================
+				   Zdarzenia
+				   ========================================================== */
+				function bindOpt(id, key, cls) {
+					const node = byId(id);
+					node.checked = !!state[key];
+					document.body.classList.toggle(cls, !state[key]);
+					node.addEventListener('change', () => {
+						state[key] = node.checked;
+						document.body.classList.toggle(cls, !node.checked);
+						save();
+					});
+				}
+
+				el.paper.addEventListener('change', () => {
+					state.paper = el.paper.value;
+					save();
+					renderEditor();
+					renderSheets();
+				});
+
+				el.label.addEventListener('input', () => {
+					state.label = el.label.value;
+					save();
+					renderSheets();
+				});
+
+				el.script.addEventListener('change', () => {
+					state.script = el.script.value;
+					save();
+					renderSheets();
+				});
+
+				el.cols.addEventListener('change', () => {
+					state.cols = el.cols.value;
+					save();
+					renderSheets();
+				});
+
+				el['foot-names'].addEventListener('input', () => {
+					state.footNames = el['foot-names'].value;
+					save();
+					renderSheets();
+				});
+				el['foot-date'].addEventListener('input', () => {
+					state.footDate = el['foot-date'].value;
+					save();
+					renderSheets();
+				});
+
+				byId('add-table').addEventListener('click', () => {
+					/* kolejny wolny numer, jeśli dotychczasowe są liczbami */
+					const nums = state.tables
+						.map((t) => parseInt(t.no, 10))
+						.filter((n) => !isNaN(n));
+					const next = nums.length ? Math.max.apply(null, nums) + 1 : 1;
+					state.tables.push({ no: String(next), guests: [] });
+					save();
+					renderEditor();
+					renderSheets();
+					el.tables.lastElementChild.scrollIntoView({ block: 'nearest' });
+				});
+
+				byId('renumber').addEventListener('click', () => {
+					state.tables.forEach((t, i) => (t.no = String(i + 1)));
+					save();
+					renderEditor();
+					renderSheets();
+				});
+
+				byId('clear-all').addEventListener('click', () => {
+					if (!confirm('Usunąć wszystkie stoliki i listy gości?')) return;
+					state.tables = [{ no: '1', guests: [] }];
+					save();
+					renderEditor();
+					renderSheets();
+				});
+
+				byId('bulk-apply').addEventListener('click', () => applyBulk(false));
+				byId('bulk-append').addEventListener('click', () => applyBulk(true));
+
+				byId('export').addEventListener('click', () => {
+					const blob = new Blob([JSON.stringify(state, null, '\t')], {
+						type: 'application/json',
+					});
+					const a = document.createElement('a');
+					a.href = URL.createObjectURL(blob);
+					a.download = 'stoliki.json';
+					a.click();
+					setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+				});
+
+				byId('import-btn').addEventListener('click', () =>
+					el['import-file'].click()
+				);
+				el['import-file'].addEventListener('change', () => {
+					const file = el['import-file'].files && el['import-file'].files[0];
+					if (!file) return;
+					const reader = new FileReader();
+					reader.onload = () => {
+						try {
+							const data = JSON.parse(reader.result);
+							if (!data || !Array.isArray(data.tables))
+								throw new Error('zły format');
+							state = Object.assign(state, data);
+							state.tables = data.tables.map((t) => ({
+								no: String(t.no == null ? '' : t.no),
+								guests: Array.isArray(t.guests) ? t.guests.slice() : [],
+							}));
+							syncControls();
+							save();
+							renderEditor();
+							renderSheets();
+						} catch (e) {
+							alert('Nie udało się wczytać pliku: ' + e.message);
+						}
+						el['import-file'].value = '';
+					};
+					reader.readAsText(file);
+				});
+
+				byId('btn-pdf').addEventListener('click', () => window.print());
+				byId('btn-print').addEventListener('click', () => window.print());
+
+				let resizeTimer;
+				window.addEventListener('resize', () => {
+					clearTimeout(resizeTimer);
+					resizeTimer = setTimeout(() => applyZoom(PAPERS[state.paper]), 120);
+				});
+
+				/* ==========================================================
+				   Start
+				   ========================================================== */
+				function syncControls() {
+					el.paper.value = state.paper;
+					el.label.value = state.label;
+					el.script.value = state.script;
+					el.cols.value = state.cols;
+					el['foot-names'].value = state.footNames;
+					el['foot-date'].value = state.footDate;
+
+					byId('opt-upper').checked = !!state.upper;
+					document.body.classList.toggle('upper', !!state.upper);
+					byId('opt-frame').checked = !!state.frame;
+					document.body.classList.toggle('no-frame', !state.frame);
+					byId('opt-foot').checked = !!state.foot;
+					document.body.classList.toggle('no-foot', !state.foot);
+					byId('opt-ruler').checked = !!state.ruler;
+					document.body.classList.toggle('no-ruler', !state.ruler);
+				}
+
+				load();
+				syncControls();
+
+				/* WERSALIKI mają odwrotną polaryzację niż reszta przełączników */
+				byId('opt-upper').addEventListener('change', function () {
+					state.upper = this.checked;
+					document.body.classList.toggle('upper', this.checked);
+					save();
+					renderSheets();
+				});
+				bindOpt('opt-frame', 'frame', 'no-frame');
+				bindOpt('opt-foot', 'foot', 'no-foot');
+				bindOpt('opt-ruler', 'ruler', 'no-ruler');
+
+				renderEditor();
+
+				const boot = () => renderSheets();
+				if (document.fonts && document.fonts.ready) {
+					document.fonts.ready.then(boot);
+				}
+				window.addEventListener('load', boot);
+				boot();
+			})();
+		</script>
+	</body>
+</html>
