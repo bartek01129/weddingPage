@@ -563,11 +563,18 @@ async function main() {
 		maxPhotos: MAX_PHOTOS,
 	});
 	await initDB();
-	app.listen(PORT, () => {
+	const server = app.listen(PORT, () => {
 		console.log(
 			`  Wedding backend running on port ${PORT} (DATA_DIR: ${DATA_DIR}, zdjęć: ${loaded})`,
 		);
 	});
+
+	// requestTimeout liczy czas do odebrania CAŁEGO body, a nie do odpowiedzi.
+	// Domyślne 5 min Node'a zrywało wysyłkę dużego zdjęcia przez słabe wifi
+	// w połowie transferu — od zdjęcia limitu 15 MB pliki bywają dużo większe.
+	server.requestTimeout = 15 * 60 * 1000;
+	// headersTimeout musi być mniejszy niż requestTimeout; nagłówki i tak lecą od razu.
+	server.headersTimeout = 70 * 1000;
 }
 
 main().catch((err) => {
