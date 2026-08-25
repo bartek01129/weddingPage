@@ -31,3 +31,6 @@ print/
 # Local dev photo storage
 backend/data/
 backend/data-*/
+
+# Kopia zdjec z produkcji (backup, nie commitowac)
+Photos/

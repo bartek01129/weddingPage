@@ -24,6 +24,9 @@ const dirs = {
 	web: path.join(DATA_DIR, 'web'),
 	thumbs: path.join(DATA_DIR, 'thumbs'),
 	tmp: path.join(DATA_DIR, 'tmp'),
+	// Kwarantanna sierot: store.init() przenosi tu pliki bez wpisu w indeksie,
+	// zamiast je kasować. Nie jest serwowana po HTTP i nie jest czyszczona.
+	trash: path.join(DATA_DIR, 'trash'),
 };
 
 app.set('trust proxy', 1);

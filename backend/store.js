@@ -85,7 +85,10 @@ async function rebuildFromDisk() {
 
 async function sweepOrphans(validIds) {
 	// Indeks jest źródłem prawdy — pliki bez wpisu to śmieci po crashu w pół
-	// operacji (upload/DELETE). Bez sprzątania wolumen ciekłby bez końca.
+	// operacji (upload/DELETE). NIE kasujemy ich: pomyłka w tej ścieżce (zły
+	// DATA_DIR, zaostrzona walidacja rekordu) oznaczałaby bezpowrotną utratę
+	// zdjęć gości, więc sieroty lądują w trash/ i czekają na ręczną decyzję.
+	let batch = null; // katalog partii tworzymy leniwie — zwykle sierot nie ma
 	for (const dir of [dirs.web, dirs.thumbs, dirs.originals]) {
 		let files;
 		try {
@@ -93,16 +96,32 @@ async function sweepOrphans(validIds) {
 		} catch {
 			continue;
 		}
+		const orphans = files.filter((f) => !validIds.has(f.split('.')[0]));
+		if (!orphans.length) continue;
+
+		if (!batch) {
+			const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+			batch = path.join(dirs.trash, stamp);
+		}
+		const destDir = path.join(batch, path.basename(dir));
+		await fs.mkdir(destDir, { recursive: true });
+		// rename w obrębie tego samego wolumenu = przenosiny bez kopiowania.
+		// Błąd pojedynczego pliku ignorujemy: sierota na dysku jest nieszkodliwa.
 		await Promise.all(
-			files
-				.filter((f) => !validIds.has(f.split('.')[0]))
-				.map((f) => fs.rm(path.join(dir, f), { force: true })),
+			orphans.map((f) =>
+				fs.rename(path.join(dir, f), path.join(destDir, f)).catch(() => {}),
+			),
+		);
+		console.warn(
+			`store: ${orphans.length} sierot z ${path.basename(dir)}/ → trash/${path.basename(batch)}/`,
 		);
 	}
 }
 
 export async function init(config) {
-	dirs = config.dirs;
+	// trash/ dokładamy tu, a nie tylko w server.js: kwarantanna sierot ma
+	// działać nawet gdyby konfiguracja przyszła ze starszej wersji serwera.
+	dirs = { trash: path.join(config.dataDir, 'trash'), ...config.dirs };
 	indexFile = path.join(config.dataDir, 'photos.json');
 	maxPhotos = config.maxPhotos;
 
@@ -140,9 +159,23 @@ export async function init(config) {
 			thumbIds.has(r.id),
 	);
 	if (verified.length !== records.length) dirty = true;
+
+	// BEZPIECZNIK: zero zweryfikowanych rekordów przy niepustym web/ to
+	// praktycznie zawsze błąd kodu, a nie pusta galeria. Nie ruszamy wtedy ANI
+	// dysku, ANI photos.json — bez tego jedno złe wdrożenie kasuje zdjęcia
+	// i indeks naraz. Galeria świeci pustką do czasu naprawy, ale dane żyją.
+	if (verified.length === 0 && webIds.size > 0) {
+		console.error(
+			`store: PRZERWANO sprzątanie — indeks pusty, a w web/ leży ${webIds.size} plików. ` +
+				'Dysk i photos.json zostają nietknięte. Sprawdź DATA_DIR i schemat indeksu.',
+		);
+		index = [];
+		return 0;
+	}
+
 	index = verified;
 
-	// Lustrzane sprzątanie: pliki, których nie ma w indeksie, kasujemy z dysku.
+	// Lustrzane sprzątanie: pliki, których nie ma w indeksie, lądują w trash/.
 	await sweepOrphans(new Set(index.map((r) => r.id)));
 
 	if (dirty) await persist();
