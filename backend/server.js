@@ -4,11 +4,13 @@ import nodemailer from 'nodemailer';
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
 import path from 'node:path';
+import fs from 'node:fs/promises';
 import crypto, { randomUUID } from 'crypto';
 
 import * as store from './store.js';
 import { UUID_RE } from './store.js';
 import * as images from './images.js';
+import * as video from './video.js';
 
 dotenv.config();
 
@@ -17,6 +19,10 @@ const PORT = process.env.PORT || 3001;
 
 const DATA_DIR = process.env.DATA_DIR || '/data/photos';
 const MAX_PHOTOS = Number(process.env.MAX_PHOTOS || 1000);
+// Filmy celowo BEZ limitu długości i rozmiaru — gość ma nagrać, co chce.
+// Jedyną granicą jest wolne miejsce: zapchany wolumen to nie tylko odrzucony
+// upload, ale i ryzyko dla zdjęć, które już tam leżą.
+const MIN_FREE_BYTES = Number(process.env.MIN_FREE_GB || 3) * 1024 ** 3;
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
 
 const dirs = {
@@ -24,6 +30,9 @@ const dirs = {
 	web: path.join(DATA_DIR, 'web'),
 	thumbs: path.join(DATA_DIR, 'thumbs'),
 	tmp: path.join(DATA_DIR, 'tmp'),
+	// Filmy: oryginał jako <id>.src.<ext>, gotowy transkod jako <id>.mp4.
+	// Plakat filmu leży w web/ i thumbs/ razem ze zdjęciami.
+	videos: path.join(DATA_DIR, 'videos'),
 	// Kwarantanna sierot: store.init() przenosi tu pliki bez wpisu w indeksie,
 	// zamiast je kasować. Nie jest serwowana po HTTP i nie jest czyszczona.
 	trash: path.join(DATA_DIR, 'trash'),
@@ -47,6 +56,9 @@ const staticOpts = {
 };
 app.use('/photos/web', express.static(dirs.web, staticOpts));
 app.use('/photos/thumbs', express.static(dirs.thumbs, staticOpts));
+// immutable jest tu bezpieczne: po transkodzie zmienia się NAZWA pliku
+// (<id>.src.mov → <id>.mp4), więc nikt nie dostanie przeterminowanego cache'a.
+app.use('/photos/videos', express.static(dirs.videos, staticOpts));
 
 //Nodemailer
 const transporter = nodemailer.createTransport({
@@ -478,14 +490,82 @@ app.get('/api/songs/voted', async (req, res) => {
 
 // PHOTO BOOTH
 function toPhoto(rec) {
-	return {
+	const kind = rec.kind || 'photo';
+	const base = {
 		id: rec.id,
 		public_id: rec.id,
 		thumb_url: `/photos/thumbs/${rec.id}.webp`,
 		web_url: `/photos/web/${rec.id}.webp`,
 		url: `/photos/web/${rec.id}.webp`,
 		created_at: rec.created_at,
+		kind,
 	};
+	if (kind !== 'video') return base;
+	return {
+		...base,
+		// Dopóki kolejka nie skończy, video_url jest puste i zostaje sam plakat.
+		// Front, który nie zna pola kind (np. wczytany z cache'a przeglądarki),
+		// pokaże film jako zwykłe zdjęcie — brzydko, ale bez awarii.
+		video_url:
+			rec.playable && rec.video_file ? `/photos/videos/${rec.video_file}` : null,
+		processing: !rec.playable,
+		duration: rec.duration ?? null,
+	};
+}
+
+// Czy ffmpeg/ffprobe faktycznie są w obrazie. Gdyby ich zabrakło, przyjmowanie
+// filmów wyłączamy, ale galeria zdjęć ma działać dalej — jeden zepsuty build
+// nie może położyć całej strony.
+let videoReady = false;
+
+// Transkod poza requestem: ffmpeg trwa minuty, a przeglądarka czeka 180 s.
+// Kolejka w video.js puszcza jeden naraz, żeby nie zagłodzić uploadu zdjęć.
+// Źródło transkodu: nazwa z rekordu, a gdyby ten plik zniknął — dowolny
+// oryginał <id>.src.* z videos/. Bez tego rekord ze stalą nazwą wisiałby
+// w kolejce po każdym restarcie i nigdy się nie odtworzył.
+async function resolveVideoSource(rec) {
+	const recorded = path.join(dirs.videos, rec.video_file);
+	try {
+		await fs.access(recorded);
+		return recorded;
+	} catch {
+		// Plik z rekordu nie istnieje — szukamy oryginału po id.
+	}
+	try {
+		const files = await fs.readdir(dirs.videos);
+		const fallback = files.find((f) => f.startsWith(`${rec.id}.src.`));
+		return fallback ? path.join(dirs.videos, fallback) : null;
+	} catch {
+		return null;
+	}
+}
+
+function scheduleTranscode(rec) {
+	video.enqueue(async () => {
+		const src = await resolveVideoSource(rec);
+		if (!src) {
+			console.error(`Transkod pominięty — brak pliku źródłowego dla ${rec.id}.`);
+			return;
+		}
+		const outTmp = path.join(dirs.tmp, `${rec.id}.transcode.mp4`);
+		const outFinal = path.join(dirs.videos, `${rec.id}.mp4`);
+		try {
+			await video.transcodeToMp4(src, outTmp);
+			// Publikacja przez rename: plik pojawia się w videos/ dopiero gotowy.
+			await fs.rename(outTmp, outFinal);
+			const updated = await store.update(rec.id, {
+				video_file: `${rec.id}.mp4`,
+				playable: true,
+			});
+			// Wpis mógł zniknąć w trakcie (admin skasował film) — wtedy sprzątamy
+			// świeży transkod, zamiast zostawiać sierotę po usuniętym rekordzie.
+			if (!updated) await images.safeUnlink(outFinal);
+			else console.log(`Transkod gotowy: ${rec.id}`);
+		} catch (err) {
+			await images.safeUnlink(outTmp);
+			throw err;
+		}
+	});
 }
 
 function tokenMatches(provided) {
@@ -541,6 +621,102 @@ app.post('/api/photos', (req, res) => {
 	});
 });
 
+const uploadVideo = images.createUpload(dirs);
+
+// Wolne miejsce na wolumenie danych. Nie umiemy zmierzyć → nie blokujemy:
+// lepiej przyjąć film niż odrzucać uploady przez nieznane API systemu plików.
+async function freeBytes() {
+	try {
+		const st = await fs.statfs(DATA_DIR);
+		return st.bavail * st.bsize;
+	} catch {
+		return Infinity;
+	}
+}
+
+app.post('/api/videos', async (req, res) => {
+	if (!videoReady) {
+		return res
+			.status(503)
+			.json({ error: 'Wysyłanie filmów jest chwilowo niedostępne.' });
+	}
+	// Sprawdzamy PRZED odebraniem body — nie ma sensu wciągać gigabajta na
+	// dysk, na którym i tak zabraknie miejsca na transkod.
+	if ((await freeBytes()) < MIN_FREE_BYTES) {
+		return res.status(507).json({
+			error: 'Brakuje miejsca na serwerze — daj znać parze młodej.',
+			code: 'NO_SPACE',
+		});
+	}
+	uploadVideo.single('file')(req, res, async (err) => {
+		if (err) {
+			return res.status(500).json({ error: 'Błąd przesyłania pliku.' });
+		}
+		if (!req.file) return res.status(400).json({ error: 'To nie jest film.' });
+
+		if (store.count() >= MAX_PHOTOS) {
+			await images.safeUnlink(req.file.path);
+			return res
+				.status(409)
+				.json({ error: 'Galeria jest pełna.', code: 'GALLERY_FULL' });
+		}
+
+		const id = randomUUID();
+		const posterTmp = path.join(dirs.tmp, `${id}.poster.jpg`);
+		let published = false;
+		try {
+			// ffprobe jest tu jedyną bramką: nie ufamy ani rozszerzeniu, ani
+			// mimetype. Nie znajdzie ścieżki wideo → to nie jest film.
+			const meta = await video.probe(req.file.path);
+
+			// Plakat robimy serwerowo: ffmpeg i tak jest w obrazie, a kadr
+			// wyciągnięty tutaj wygląda tak samo u każdego gościa.
+			await video.extractPoster(req.file.path, posterTmp, meta.duration);
+			await images.publishPoster(posterTmp, id, dirs);
+			published = true;
+			await images.safeUnlink(posterTmp);
+
+			const srcName = `${id}.src.${meta.ext}`;
+			await fs.rename(req.file.path, path.join(dirs.videos, srcName));
+
+			const playable = video.isWebPlayable(meta);
+			const rec = {
+				id,
+				created_at: new Date().toISOString(),
+				original_ext: meta.ext,
+				kind: 'video',
+				video_file: srcName,
+				playable,
+				duration: Math.round(meta.duration),
+			};
+
+			const result = await store.insert(rec);
+			if (!result.ok) {
+				await images.removeFiles(id, null, dirs);
+				return res
+					.status(409)
+					.json({ error: 'Galeria jest pełna.', code: 'GALLERY_FULL' });
+			}
+
+			if (!playable) scheduleTranscode(rec);
+			return res.status(201).json(toPhoto(rec));
+		} catch (e) {
+			await images.safeUnlink(posterTmp);
+			await images.safeUnlink(req.file.path);
+			// Plakat mógł już trafić do web/ — usuwamy komplet, żeby nie zostawić
+			// zdjęcia-widma po filmie, który się nie zapisał.
+			if (published) await images.removeFiles(id, null, dirs);
+			if (e.code === 'NOT_VIDEO') {
+				// Rozróżniamy „to w ogóle nie media" od „to zdjęcie" — gość ma
+				// wiedzieć, że wystarczy użyć drugiego przycisku.
+				return res.status(400).json({ error: e.message || 'To nie jest film.' });
+			}
+			console.error('Upload wideo:', e);
+			return res.status(500).json({ error: 'Nie udało się zapisać filmu.' });
+		}
+	});
+});
+
 app.delete('/api/photos/:id', async (req, res) => {
 	if (!ADMIN_TOKEN || !tokenMatches(req.get('X-Admin-Token') || '')) {
 		return res.status(401).json({ error: 'Brak autoryzacji.' });
@@ -566,16 +742,37 @@ async function main() {
 		maxPhotos: MAX_PHOTOS,
 	});
 	await initDB();
+
+	try {
+		await video.assertToolsAvailable();
+		videoReady = true;
+	} catch {
+		console.error(
+			'ffmpeg/ffprobe niedostępne — upload filmów wyłączony, zdjęcia działają normalnie.',
+		);
+	}
+
 	const server = app.listen(PORT, () => {
 		console.log(
-			`  Wedding backend running on port ${PORT} (DATA_DIR: ${DATA_DIR}, zdjęć: ${loaded})`,
+			`  Wedding backend running on port ${PORT} (DATA_DIR: ${DATA_DIR}, wpisów: ${loaded}, wideo: ${videoReady ? 'tak' : 'nie'})`,
 		);
 	});
 
+	// Restart w środku transkodu nie może zostawić filmu w formacie, którego
+	// przeglądarka nie odtworzy — kolejka wznawia niedokończone zadania.
+	if (videoReady) {
+		const pending = store.pendingTranscodes();
+		for (const rec of pending) scheduleTranscode(rec);
+		if (pending.length) {
+			console.log(`Wznowiono ${pending.length} transkodów po restarcie.`);
+		}
+	}
+
 	// requestTimeout liczy czas do odebrania CAŁEGO body, a nie do odpowiedzi.
 	// Domyślne 5 min Node'a zrywało wysyłkę dużego zdjęcia przez słabe wifi
-	// w połowie transferu — od zdjęcia limitu 15 MB pliki bywają dużo większe.
-	server.requestTimeout = 15 * 60 * 1000;
+	// w połowie transferu. Filmy nie mają limitu rozmiaru, a kilkuminutowe
+	// nagranie z telefonu przez weselne wifi potrafi iść pół godziny.
+	server.requestTimeout = 60 * 60 * 1000;
 	// headersTimeout musi być mniejszy niż requestTimeout; nagłówki i tak lecą od razu.
 	server.headersTimeout = 70 * 1000;
 }

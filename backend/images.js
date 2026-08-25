@@ -64,6 +64,8 @@ export function createUpload(dirs) {
 		destination: (req, file, cb) => cb(null, dirs.tmp),
 		filename: (req, file, cb) => cb(null, `${randomUUID()}.upload`),
 	});
+	// Bez limits.fileSize: ani zdjęcia, ani filmy nie mają narzuconego rozmiaru.
+	// Granicą jest wolne miejsce, które serwer sprawdza przed przyjęciem filmu.
 	return multer({ storage, limits: { files: 1 } });
 }
 
@@ -146,6 +148,26 @@ async function generate(source, webTmp, thumbTmp) {
 	});
 }
 
+// Publikuje web/ + thumbs/ dla PODANEGO id z gotowego obrazu (kadru filmu).
+// To samo, co processUpload, ale bez losowania id i bez zapisu do originals/ —
+// dzięki temu film ma komplet plików, których wymaga weryfikacja indeksu, i
+// wygląda w siatce jak każde inne zdjęcie.
+export async function publishPoster(source, id, dirs) {
+	const webTmp = path.join(dirs.tmp, `${id}.web.webp`);
+	const thumbTmp = path.join(dirs.tmp, `${id}.thumb.webp`);
+	try {
+		await generate(source, webTmp, thumbTmp);
+		await fs.rename(webTmp, path.join(dirs.web, `${id}.webp`));
+		await fs.rename(thumbTmp, path.join(dirs.thumbs, `${id}.webp`));
+	} catch (err) {
+		// Sprzątamy tylko tmp; to, co zdążyło trafić do web/, usunie removeFiles
+		// po stronie wołającego — razem z resztą plików nieudanego filmu.
+		await safeUnlink(webTmp);
+		await safeUnlink(thumbTmp);
+		throw err;
+	}
+}
+
 // Przetwarza temp multera → publikuje web/thumb/original. Zwraca rekord indeksu.
 // Każda ścieżka błędu sprząta wszystko, co zdążyło powstać (łącznie z temp multera).
 export async function processUpload(tempPath, dirs) {
@@ -178,26 +200,29 @@ export async function processUpload(tempPath, dirs) {
 	}
 }
 
-async function unlinkOriginalById(id, dirs) {
-	// ext nieznany (indeks odbudowany ze skanu) → usuń dowolny original o tym id.
+async function unlinkByIdIn(dir, id) {
+	// ext nieznany (indeks odbudowany ze skanu) → usuń dowolny plik o tym id.
 	let files;
 	try {
-		files = await fs.readdir(dirs.originals);
+		files = await fs.readdir(dir);
 	} catch {
 		return;
 	}
 	await Promise.all(
 		files
 			.filter((f) => f.startsWith(`${id}.`))
-			.map((f) => safeUnlink(path.join(dirs.originals, f))),
+			.map((f) => safeUnlink(path.join(dir, f))),
 	);
 }
 
-// Usuwa komplet plików zdjęcia (web + thumb + original). Używane przy DELETE
-// oraz gdy insert do indeksu odmówił (galeria pełna) i trzeba wycofać upload.
+// Usuwa komplet plików wpisu (web + thumb + original + ewentualne wideo).
+// Używane przy DELETE oraz gdy insert do indeksu odmówił (galeria pełna)
+// i trzeba wycofać upload.
 export async function removeFiles(id, ext, dirs) {
 	await safeUnlink(path.join(dirs.web, `${id}.webp`));
 	await safeUnlink(path.join(dirs.thumbs, `${id}.webp`));
 	if (ext) await safeUnlink(path.join(dirs.originals, `${id}.${ext}`));
-	else await unlinkOriginalById(id, dirs);
+	else await unlinkByIdIn(dirs.originals, id);
+	// Film trzyma w videos/ oryginał i (po kolejce) transkod — lecą oba.
+	if (dirs.videos) await unlinkByIdIn(dirs.videos, id);
 }

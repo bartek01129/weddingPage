@@ -16,6 +16,7 @@ services:
       - DB_URL=${DB_URL}
       - DATA_DIR=/data/photos
       - MAX_PHOTOS=1000
+      - MIN_FREE_GB=3
       - ADMIN_TOKEN=${ADMIN_TOKEN}
     volumes:
       - ./photos-data:/data/photos

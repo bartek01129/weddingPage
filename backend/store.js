@@ -1,5 +1,8 @@
-// Indeks zdjęć: trzymany w pamięci (GET czyta stąd, bez I/O na request),
-// utrwalany do photos.json. Rekord: { id, created_at, original_ext, bytes }.
+// Indeks galerii: trzymany w pamięci (GET czyta stąd, bez I/O na request),
+// utrwalany do photos.json.
+// Rekord: { id, created_at, original_ext, kind, video_file?, playable?, duration? }.
+// kind === 'video' oznacza film: web/ i thumbs/ trzymają wtedy PLAKAT (kadr),
+// a sam plik leży w videos/. Brak pola kind = stare zdjęcie sprzed wideo.
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -54,6 +57,25 @@ async function cleanDir(dir) {
 	);
 }
 
+// Mapa id → nazwa pliku w videos/. Gotowy transkod (<id>.mp4) wygrywa z
+// oryginałem (<id>.src.<ext>) — to on jest wersją do odtwarzania.
+async function listVideoFiles() {
+	let files;
+	try {
+		files = await fs.readdir(dirs.videos);
+	} catch {
+		return new Map();
+	}
+	const byId = new Map();
+	for (const f of files) {
+		const id = f.split('.')[0];
+		if (!UUID_RE.test(id)) continue;
+		const current = byId.get(id);
+		if (!current || (f.endsWith('.mp4') && !f.includes('.src.'))) byId.set(id, f);
+	}
+	return byId;
+}
+
 async function rebuildFromDisk() {
 	// Awaryjnie odtwarzamy indeks ze skanu web/: id = nazwa pliku, created_at = mtime.
 	// Oryginał/rozmiar są nieodtwarzalne — original_ext zostaje null (patrz usuwanie).
@@ -63,6 +85,9 @@ async function rebuildFromDisk() {
 	} catch {
 		return [];
 	}
+	// Plakat filmu leży w web/ dokładnie tak jak zdjęcie — bez zajrzenia do
+	// videos/ odbudowa zamieniłaby każdy film w nieruchomy kadr.
+	const videoFiles = await listVideoFiles();
 	const records = [];
 	for (const f of files) {
 		if (!f.endsWith('.webp')) continue;
@@ -74,10 +99,18 @@ async function rebuildFromDisk() {
 		} catch {
 			continue;
 		}
+		const videoFile = videoFiles.get(id);
 		records.push({
 			id,
 			created_at: stat.mtime.toISOString(),
 			original_ext: null,
+			kind: videoFile ? 'video' : 'photo',
+			...(videoFile && {
+				video_file: videoFile,
+				// Po odbudowie nie wiemy, czy oryginał jest odtwarzalny — jeśli to
+				// nie jest gotowy transkod, niech kolejka obejrzy go jeszcze raz.
+				playable: videoFile.endsWith('.mp4') && !videoFile.includes('.src.'),
+			}),
 		});
 	}
 	return records;
@@ -89,7 +122,7 @@ async function sweepOrphans(validIds) {
 	// DATA_DIR, zaostrzona walidacja rekordu) oznaczałaby bezpowrotną utratę
 	// zdjęć gości, więc sieroty lądują w trash/ i czekają na ręczną decyzję.
 	let batch = null; // katalog partii tworzymy leniwie — zwykle sierot nie ma
-	for (const dir of [dirs.web, dirs.thumbs, dirs.originals]) {
+	for (const dir of [dirs.web, dirs.thumbs, dirs.originals, dirs.videos]) {
 		let files;
 		try {
 			files = await fs.readdir(dir);
@@ -119,9 +152,13 @@ async function sweepOrphans(validIds) {
 }
 
 export async function init(config) {
-	// trash/ dokładamy tu, a nie tylko w server.js: kwarantanna sierot ma
-	// działać nawet gdyby konfiguracja przyszła ze starszej wersji serwera.
-	dirs = { trash: path.join(config.dataDir, 'trash'), ...config.dirs };
+	// trash/ i videos/ dokładamy tu, a nie tylko w server.js: mają działać
+	// nawet gdyby konfiguracja przyszła ze starszej wersji serwera.
+	dirs = {
+		trash: path.join(config.dataDir, 'trash'),
+		videos: path.join(config.dataDir, 'videos'),
+		...config.dirs,
+	};
 	indexFile = path.join(config.dataDir, 'photos.json');
 	maxPhotos = config.maxPhotos;
 
@@ -173,7 +210,10 @@ export async function init(config) {
 		return 0;
 	}
 
-	index = verified;
+	// Rekordy sprzed wideo nie mają pola kind — dopisujemy je w pamięci, a nie
+	// migracją pliku: photos.json zostaje czytelny dla starszej wersji backendu,
+	// gdyby trzeba było się wycofać.
+	index = verified.map((r) => (r.kind === 'video' ? r : { ...r, kind: 'photo' }));
 
 	// Lustrzane sprzątanie: pliki, których nie ma w indeksie, lądują w trash/.
 	await sweepOrphans(new Set(index.map((r) => r.id)));
@@ -195,6 +235,30 @@ export function get(id) {
 
 export function count() {
 	return index.length;
+}
+
+// Zwraca rekordy, których transkod nie doszedł do końca — kolejka wznawia je
+// po restarcie, żeby film nie został na zawsze w formacie nie do odtworzenia.
+export function pendingTranscodes() {
+	return index.filter((r) => r.kind === 'video' && !r.playable);
+}
+
+// Punktowa aktualizacja rekordu (wynik transkodowania). W tym samym łańcuchu
+// mutacji co insert/remove — worker w tle nie może wejść w środek zapisu.
+export function update(id, patch) {
+	return serialize(async () => {
+		const i = index.findIndex((r) => r.id === id);
+		if (i === -1) return null;
+		const previous = index[i];
+		index[i] = { ...previous, ...patch };
+		try {
+			await persist();
+		} catch (err) {
+			index[i] = previous; // zapis padł → wracamy do stanu sprzed łatki
+			throw err;
+		}
+		return index[i];
+	});
 }
 
 // Wstawienie w sekcji krytycznej: limit sprawdzamy TU (nie tylko przed sharpem),

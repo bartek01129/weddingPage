@@ -3,6 +3,7 @@ import { motion, AnimatePresence, useMotionValue } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 
 const API_URL = '/api/photos';
+const VIDEO_API_URL = '/api/videos';
 const PAGE_SIZE = 40;
 const OPTIMISTIC_WINDOW_MS = 60_000;
 const SWIPE_DISTANCE = 70; // px potrzebne do zmiany zdjęcia
@@ -15,6 +16,22 @@ function isImage(file) {
 	const okType = file.type.startsWith('image/');
 	const okHeic = /\.(heic|heif)$/i.test(file.name);
 	return okType || okHeic;
+}
+
+function isVideo(file) {
+	// Część telefonów oddaje .mov z pustym type — rozszerzenie jest wtedy jedyną
+	// wskazówką. To tylko rozpoznanie trasy: film i tak weryfikuje ffprobe.
+	const okType = file.type.startsWith('video/');
+	const okExt = /\.(mp4|mov|m4v|webm|avi|3gp|mkv)$/i.test(file.name);
+	return okType || okExt;
+}
+
+// Sekundy → 0:07 / 1:23. null gdy backend nie zna długości (indeks po odbudowie).
+function formatDuration(seconds) {
+	if (!Number.isFinite(seconds) || seconds <= 0) return null;
+	const m = Math.floor(seconds / 60);
+	const s = Math.floor(seconds % 60);
+	return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 const makeId = () =>
@@ -95,6 +112,9 @@ async function shrinkImage(file) {
 }
 
 async function prepareForUpload(file) {
+	// Filmu nie tykamy: canvas go nie zdekoduje, a zmniejszaniem zajmuje się
+	// ffmpeg po stronie serwera. Ten warunek MUSI być przed limitem rozmiaru.
+	if (isVideo(file)) return file;
 	if (file.size <= SHRINK_ABOVE_BYTES) return file;
 	try {
 		return await queueShrink(() => shrinkImage(file));
@@ -106,7 +126,7 @@ async function prepareForUpload(file) {
 	}
 }
 
-function uploadOnce(file, onProgress) {
+function uploadOnce(file, url, onProgress) {
 	return new Promise((resolve, reject) => {
 		const fd = new FormData();
 		fd.append('file', file);
@@ -137,7 +157,7 @@ function uploadOnce(file, onProgress) {
 			);
 		};
 
-		xhr.open('POST', API_URL);
+		xhr.open('POST', url);
 		xhr.upload.onprogress = (e) => {
 			if (e.lengthComputable) onProgress(e.loaded / e.total);
 			arm(STALL_TIMEOUT_MS, failStalled);
@@ -164,7 +184,9 @@ function uploadOnce(file, onProgress) {
 				reject(new UploadError('Galeria jest pełna — osiągnięto limit zdjęć.'));
 				return;
 			}
-			if (xhr.status >= 500) {
+			// 503 (brak ffmpeg) i 507 (brak miejsca) to decyzje serwera, nie
+			// awarie — ponawianie niczego nie zmieni, a zajmie gościowi minutę.
+			if (xhr.status >= 500 && xhr.status !== 503 && xhr.status !== 507) {
 				// Serwer przy błędzie sprząta swoje pliki, więc retry nie zrobi duplikatu.
 				reject(
 					new UploadError(data?.error || `Błąd serwera (${xhr.status})`, {
@@ -190,10 +212,10 @@ function uploadOnce(file, onProgress) {
 	});
 }
 
-async function uploadToServer(file, onProgress) {
+async function uploadToServer(file, url, onProgress) {
 	for (let attempt = 1; ; attempt++) {
 		try {
-			return await uploadOnce(file, onProgress);
+			return await uploadOnce(file, url, onProgress);
 		} catch (err) {
 			if (!err.retryable || attempt >= MAX_ATTEMPTS) throw err;
 			onProgress(0); // pasek wraca na start — widać, że lecimy od nowa
@@ -265,10 +287,10 @@ export default function PhotoBooth() {
 		setErrorMsg('');
 		setQueue((q) => q.filter((it) => it.status === 'uploading'));
 
-		const accepted = files.filter(isImage);
+		const accepted = files.filter((f) => isImage(f) || isVideo(f));
 		const rejected = files.length - accepted.length;
 		if (rejected > 0)
-			setErrorMsg(`Pominięto ${rejected} plik(ów) — to nie są zdjęcia.`);
+			setErrorMsg(`Pominięto ${rejected} plik(ów) — to nie są zdjęcia ani filmy.`);
 
 		const items = accepted.map((file) => ({ file, id: makeId() }));
 		setQueue((q) => [
@@ -288,9 +310,10 @@ export default function PhotoBooth() {
 		const worker = async () => {
 			while (cursor < items.length) {
 				const { file, id } = items[cursor++];
+				const video = isVideo(file);
 				try {
 					const payload = await prepareForUpload(file);
-					const data = await uploadToServer(payload, (p) =>
+					const data = await uploadToServer(payload, video ? VIDEO_API_URL : API_URL, (p) =>
 						setQueue((q) =>
 							q.map((it) => (it.id === id ? { ...it, progress: p } : it)),
 						),
@@ -308,7 +331,10 @@ export default function PhotoBooth() {
 					setQueue((q) =>
 						q.map((it) => (it.id === id ? { ...it, status: 'error' } : it)),
 					);
-					setErrorMsg(err.message || 'Nie udało się przesłać zdjęcia.');
+					setErrorMsg(
+						err.message ||
+							`Nie udało się przesłać ${video ? 'filmu' : 'zdjęcia'}.`,
+					);
 				}
 			}
 		};
@@ -328,7 +354,8 @@ export default function PhotoBooth() {
 
 	const handleDeletePhoto = async (e, photo) => {
 		e.stopPropagation();
-		if (!window.confirm('Usunąć to zdjęcie?')) return;
+		const noun = photo.kind === 'video' ? 'film' : 'zdjęcie';
+		if (!window.confirm(`Usunąć to ${noun}?`)) return;
 		try {
 			const res = await fetch(`${API_URL}/${photo.id}`, {
 				method: 'DELETE',
@@ -496,7 +523,7 @@ export default function PhotoBooth() {
 							{/* INPUT DLA GALERII */}
 							<input
 								type='file'
-								accept='image/*'
+								accept='image/*,video/*'
 								multiple
 								onChange={onInputChange}
 								id='gallery-input'
@@ -520,6 +547,38 @@ export default function PhotoBooth() {
 									/>
 								</svg>
 								<span className='text-sm md:text-base'>Z biblioteki</span>
+							</label>
+						</div>
+
+						{/* INPUT DLA FILMU — osobny wiersz, nie trzeci kafelek: trzy
+						    równe przyciski robią się nieklikalne na wąskim telefonie. */}
+						<div className='mt-3'>
+							<input
+								type='file'
+								accept='video/*'
+								capture='environment'
+								onChange={onInputChange}
+								id='video-input'
+								className='hidden'
+							/>
+							<label
+								htmlFor='video-input'
+								className='w-full flex flex-row items-center justify-center gap-2 px-4 py-3 bg-white text-accent-green border border-accent-gold/60 rounded-xl font-semibold shadow-softer cursor-pointer hover:border-accent-gold hover:bg-accent-gold/5 active:scale-95 transition-all'
+							>
+								<svg
+									className='w-5 h-5'
+									fill='none'
+									stroke='currentColor'
+									viewBox='0 0 24 24'
+								>
+									<path
+										strokeLinecap='round'
+										strokeLinejoin='round'
+										strokeWidth={2}
+										d='M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z'
+									/>
+								</svg>
+								<span className='text-sm md:text-base'>Nagraj film</span>
 							</label>
 						</div>
 
@@ -611,10 +670,33 @@ export default function PhotoBooth() {
 											loadedImages.has(photo.id) ? 'opacity-100' : 'opacity-0'
 										}`}
 									/>
+									{photo.kind === 'video' && (
+										<>
+											{/* Delikatny cień od dołu — bez niego złoty znacznik
+											    ginie na jasnym kadrze. */}
+											<div className='pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/45 to-transparent' />
+											<div className='pointer-events-none absolute inset-0 flex items-center justify-center'>
+												<span className='flex items-center justify-center w-12 h-12 rounded-full bg-black/35 backdrop-blur-sm border border-white/70 shadow-soft transition-transform duration-500 group-hover:scale-110'>
+													<svg
+														className='w-5 h-5 translate-x-[1px] text-white'
+														viewBox='0 0 24 24'
+														fill='currentColor'
+													>
+														<path d='M8 5v14l11-7z' />
+													</svg>
+												</span>
+											</div>
+											<span className='pointer-events-none absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-black/45 text-[11px] tracking-wide text-white/95 font-light'>
+												{photo.processing
+													? 'przetwarzanie…'
+													: formatDuration(photo.duration) || 'film'}
+											</span>
+										</>
+									)}
 									{ADMIN_TOKEN && (
 										<button
 											onClick={(e) => handleDeletePhoto(e, photo)}
-											title='Usuń zdjęcie'
+											title={photo.kind === 'video' ? 'Usuń film' : 'Usuń zdjęcie'}
 											className='absolute top-2 right-2 z-10 p-1.5 rounded-lg bg-accent-green/70 text-white/85 hover:text-white hover:bg-red-500/80 transition-colors'
 										>
 											<svg
@@ -719,24 +801,63 @@ export default function PhotoBooth() {
 								</button>
 							)}
 
-							<motion.img
-								key={selectedPhoto.id}
-								initial={{ scale: 0.9, opacity: 0 }}
-								animate={{ scale: 1, opacity: 1 }}
-								exit={{ scale: 0.9, opacity: 0 }}
-								src={selectedPhoto.web_url}
-								draggable={false}
-								drag='x'
-								dragDirectionLock
-								dragConstraints={{ left: 0, right: 0 }}
-								dragElastic={0.6}
-								dragMomentum={false}
-								style={{ x: dragX, touchAction: 'pan-y' }}
-								onDrag={handleDrag}
-								onDragEnd={handleDragEnd}
-								className='max-w-full max-h-[90vh] rounded-lg shadow-2xl object-contain cursor-default select-none'
-								onClick={(e) => e.stopPropagation()}
-							/>
+							{selectedPhoto.kind === 'video' ? (
+								// Film NIE dostaje drag='x': przeciąganie zjadałoby natywne
+								// kontrolki (przewijanie, głośność). Nawigacja zostaje na
+								// strzałkach i klawiaturze, a to jest ważniejsze niż swipe.
+								<motion.div
+									key={selectedPhoto.id}
+									initial={{ scale: 0.9, opacity: 0 }}
+									animate={{ scale: 1, opacity: 1 }}
+									exit={{ scale: 0.9, opacity: 0 }}
+									className='flex flex-col items-center gap-4 max-w-full'
+									onClick={(e) => e.stopPropagation()}
+								>
+									{selectedPhoto.video_url ? (
+										<video
+											src={selectedPhoto.video_url}
+											poster={selectedPhoto.web_url}
+											controls
+											autoPlay
+											playsInline
+											preload='metadata'
+											className='max-w-full max-h-[85vh] rounded-lg shadow-2xl bg-black'
+										/>
+									) : (
+										// Transkod jeszcze trwa — pokazujemy plakat, żeby gość
+										// widział, że film dotarł, i wiedział, że ma wrócić.
+										<>
+											<img
+												src={selectedPhoto.web_url}
+												alt='Kadr z filmu'
+												className='max-w-full max-h-[75vh] rounded-lg shadow-2xl object-contain opacity-70'
+											/>
+											<p className='font-serif italic text-white/80 text-center px-6'>
+												Film się przygotowuje — zajrzyj za chwilę.
+											</p>
+										</>
+									)}
+								</motion.div>
+							) : (
+								<motion.img
+									key={selectedPhoto.id}
+									initial={{ scale: 0.9, opacity: 0 }}
+									animate={{ scale: 1, opacity: 1 }}
+									exit={{ scale: 0.9, opacity: 0 }}
+									src={selectedPhoto.web_url}
+									draggable={false}
+									drag='x'
+									dragDirectionLock
+									dragConstraints={{ left: 0, right: 0 }}
+									dragElastic={0.6}
+									dragMomentum={false}
+									style={{ x: dragX, touchAction: 'pan-y' }}
+									onDrag={handleDrag}
+									onDragEnd={handleDragEnd}
+									className='max-w-full max-h-[90vh] rounded-lg shadow-2xl object-contain cursor-default select-none'
+									onClick={(e) => e.stopPropagation()}
+								/>
+							)}
 						</motion.div>
 					)}
 				</AnimatePresence>
