@@ -87,16 +87,26 @@ export async function probe(file) {
 	};
 }
 
-// Czy plik da się podać przeglądarce BEZ przekodowania. W razie wątpliwości
-// zwracamy false — zbędny transkod kosztuje minutę CPU, a film, którego gość
-// nie umie odtworzyć, kosztuje wspomnienie.
-export function isWebPlayable(meta) {
-	// major_brand 'qt' = kontener QuickTime (.mov z iPhone'a). Ten sam
-	// format_name co mp4, ale przeglądarki traktują go różnie — przekodujmy.
-	if (meta.majorBrand.startsWith('qt')) return false;
-	if (!WEB_VIDEO_CODECS.has(meta.vcodec)) return false;
-	if (meta.acodec && !WEB_AUDIO_CODECS.has(meta.acodec)) return false;
-	return meta.ext === 'mp4' || meta.ext === 'webm';
+// Co trzeba zrobić, żeby przeglądarka to odtworzyła:
+//   'ready'  — nic, plik idzie do galerii nietknięty
+//   'repack' — tylko zmiana opakowania, strumień wideo kopiujemy 1:1 (bezstratnie)
+//   'encode' — pełne przekodowanie, jedyny przypadek, w którym tracimy jakość
+//
+// Rozdzielenie 'repack' od 'encode' jest tu najważniejsze: iPhone w trybie
+// „Najbardziej zgodne" nagrywa H.264 w kontenerze .mov. Strumień jest gotowy do
+// odtworzenia — złe jest wyłącznie opakowanie. Przekodowywanie takiego filmu
+// to strata jakości bez żadnego powodu (i minuta CPU zamiast sekundy).
+export function playbackPlan(meta) {
+	if (!WEB_VIDEO_CODECS.has(meta.vcodec)) return 'encode';
+
+	const audioOk = !meta.acodec || WEB_AUDIO_CODECS.has(meta.acodec);
+	// major_brand 'qt' = kontener QuickTime (.mov). Ten sam format_name co mp4,
+	// ale przeglądarki traktują go różnie, więc przepakowujemy.
+	const containerOk =
+		!meta.majorBrand.startsWith('qt') && (meta.ext === 'mp4' || meta.ext === 'webm');
+
+	if (containerOk && audioOk) return 'ready';
+	return 'repack';
 }
 
 // Kadr na plakat. Sekunda od początku, żeby nie trafić w czarną klatkę, ale
@@ -117,34 +127,70 @@ export async function extractPoster(src, outJpg, duration) {
 	);
 }
 
-// Dłuższy bok do 1280 px, -2 pilnuje parzystości wymiarów (wymóg yuv420p).
-const SCALE_1280 =
-	"scale='if(gt(iw,ih),min(1280,iw),-2)':'if(gt(iw,ih),-2,min(1280,ih))'";
+// faststart przenosi indeks na początek pliku: odtwarzanie rusza od razu,
+// bez ściągania całości. Bez tego film "wisi" na wolnym łączu.
+const FASTSTART = ['-movflags', '+faststart'];
 
-export async function transcodeToMp4(src, outMp4) {
+// Przepakowanie: strumień wideo kopiujemy bit w bit, więc jakość jest DOKŁADNIE
+// taka jak z telefonu. Trwa sekundę zamiast minut. Ścieżkę dźwiękową ruszamy
+// tylko wtedy, gdy jej kodek nie nadaje się do przeglądarki.
+export async function repackToMp4(src, outMp4, meta) {
+	const audioOk = !meta.acodec || WEB_AUDIO_CODECS.has(meta.acodec);
 	await run(
 		'ffmpeg',
 		[
 			'-y',
 			'-i', src,
-			'-vf', SCALE_1280,
+			'-c:v', 'copy',
+			...(meta.acodec ? (audioOk ? ['-c:a', 'copy'] : ['-c:a', 'aac', '-b:a', '192k']) : []),
+			...FASTSTART,
+			outMp4,
+		],
+		EXEC_OPTS,
+	);
+}
+
+// Dłuższy bok do 1920 px, -2 pilnuje parzystości wymiarów (wymóg yuv420p).
+// min() nie powiększa: film nagrany w 720p zostaje w 720p.
+const SCALE_1920 =
+	"scale='if(gt(iw,ih),min(1920,iw),-2)':'if(gt(iw,ih),-2,min(1920,ih))'";
+
+// Pełne przekodowanie — tylko dla kodeków, których przeglądarka nie odtworzy
+// (praktycznie: HEVC z iPhone'a). crf 21 jest wizualnie bliskie oryginału;
+// przy braku limitu rozmiaru nie ma powodu oszczędzać na jakości wspomnień.
+export async function encodeToMp4(src, outMp4) {
+	await run(
+		'ffmpeg',
+		[
+			'-y',
+			'-i', src,
+			'-vf', SCALE_1920,
 			'-c:v', 'libx264',
 			'-preset', 'veryfast',
-			'-crf', '26',
+			'-crf', '21',
 			'-profile:v', 'high',
 			'-pix_fmt', 'yuv420p',
 			'-c:a', 'aac',
-			'-b:a', '128k',
-			'-ac', '2',
-			// faststart przenosi indeks na początek pliku: odtwarzanie rusza od
-			// razu, bez ściągania całości. Bez tego film "wisi" na wolnym łączu.
-			'-movflags', '+faststart',
+			'-b:a', '192k',
+			...FASTSTART,
 			// Dwa wątki: transkod ma nie zagłodzić uploadów zdjęć na 2-rdzeniowym VPS.
 			'-threads', '2',
 			outMp4,
 		],
 		EXEC_OPTS,
 	);
+}
+
+// Jedno wejście dla kolejki: sama decyduje, czy wystarczy przepakowanie.
+// Dzięki temu wznowienie po restarcie nie musi pamiętać planu — wystarczy
+// ponowny ffprobe pliku źródłowego.
+export async function makePlayable(src, outMp4, meta) {
+	if (playbackPlan(meta) === 'encode') {
+		await encodeToMp4(src, outMp4);
+		return 'encode';
+	}
+	await repackToMp4(src, outMp4, meta);
+	return 'repack';
 }
 
 // Kolejka transkodów: JEDEN naraz. Równoległy ffmpeg na małej maszynie kładzie

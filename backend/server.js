@@ -550,7 +550,10 @@ function scheduleTranscode(rec) {
 		const outTmp = path.join(dirs.tmp, `${rec.id}.transcode.mp4`);
 		const outFinal = path.join(dirs.videos, `${rec.id}.mp4`);
 		try {
-			await video.transcodeToMp4(src, outTmp);
+			// Ponowny ffprobe zamiast pamiętania planu w rekordzie — dzięki temu
+			// wznowienie po restarcie podejmuje tę samą decyzję co upload.
+			const meta = await video.probe(src);
+			const how = await video.makePlayable(src, outTmp, meta);
 			// Publikacja przez rename: plik pojawia się w videos/ dopiero gotowy.
 			await fs.rename(outTmp, outFinal);
 			const updated = await store.update(rec.id, {
@@ -558,9 +561,12 @@ function scheduleTranscode(rec) {
 				playable: true,
 			});
 			// Wpis mógł zniknąć w trakcie (admin skasował film) — wtedy sprzątamy
-			// świeży transkod, zamiast zostawiać sierotę po usuniętym rekordzie.
+			// świeży plik, zamiast zostawiać sierotę po usuniętym rekordzie.
 			if (!updated) await images.safeUnlink(outFinal);
-			else console.log(`Transkod gotowy: ${rec.id}`);
+			else
+				console.log(
+					`Film gotowy (${how === 'repack' ? 'przepakowanie, bez straty jakości' : 'przekodowanie'}): ${rec.id}`,
+				);
 		} catch (err) {
 			await images.safeUnlink(outTmp);
 			throw err;
@@ -679,7 +685,9 @@ app.post('/api/videos', async (req, res) => {
 			const srcName = `${id}.src.${meta.ext}`;
 			await fs.rename(req.file.path, path.join(dirs.videos, srcName));
 
-			const playable = video.isWebPlayable(meta);
+			// 'ready' = plik idzie do galerii nietknięty. Pozostałe plany kolejka
+			// domknie w tle: przepakowaniem (bezstratnie) albo przekodowaniem.
+			const playable = video.playbackPlan(meta) === 'ready';
 			const rec = {
 				id,
 				created_at: new Date().toISOString(),

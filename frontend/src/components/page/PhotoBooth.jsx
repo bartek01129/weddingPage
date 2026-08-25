@@ -553,10 +553,15 @@ export default function PhotoBooth() {
 						{/* INPUT DLA FILMU — osobny wiersz, nie trzeci kafelek: trzy
 						    równe przyciski robią się nieklikalne na wąskim telefonie. */}
 						<div className='mt-3'>
+							{/* BEZ capture. Ten atrybut otwiera kamerę w trybie „szybkiego
+							    nagrania": iOS zjeżdża wtedy do ~480p, a Android startuje
+							    z najniższego profilu kamery — stąd tragiczna jakość.
+							    Bez niego telefon pokazuje wybór („Nagraj film" / biblioteka)
+							    i nagrywa w pełnej rozdzielczości swojego aparatu.
+							    Jedno tapnięcie więcej, kilka razy lepszy obraz. */}
 							<input
 								type='file'
 								accept='video/*'
-								capture='environment'
 								onChange={onInputChange}
 								id='video-input'
 								className='hidden'
