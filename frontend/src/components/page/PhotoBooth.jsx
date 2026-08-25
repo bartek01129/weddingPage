@@ -672,13 +672,12 @@ export default function PhotoBooth() {
 									/>
 									{photo.kind === 'video' && (
 										<>
-											{/* Delikatny cień od dołu — bez niego złoty znacznik
-											    ginie na jasnym kadrze. */}
-											<div className='pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/45 to-transparent' />
+											{/* Znacznik filmu w języku papeterii: krem, złoty
+											    hairline, zielona strzałka — nie czarne szkło. */}
 											<div className='pointer-events-none absolute inset-0 flex items-center justify-center'>
-												<span className='flex items-center justify-center w-12 h-12 rounded-full bg-black/35 backdrop-blur-sm border border-white/70 shadow-soft transition-transform duration-500 group-hover:scale-110'>
+												<span className='flex items-center justify-center w-14 h-14 rounded-full bg-cream/90 backdrop-blur-[2px] border border-accent-gold/70 shadow-soft transition-transform duration-500 group-hover:scale-110'>
 													<svg
-														className='w-5 h-5 translate-x-[1px] text-white'
+														className='w-5 h-5 translate-x-[2px] text-accent-green'
 														viewBox='0 0 24 24'
 														fill='currentColor'
 													>
@@ -686,7 +685,7 @@ export default function PhotoBooth() {
 													</svg>
 												</span>
 											</div>
-											<span className='pointer-events-none absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-black/45 text-[11px] tracking-wide text-white/95 font-light'>
+											<span className='pointer-events-none absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-cream/90 border border-accent-gold/40 text-[11px] tracking-wide text-accent-green font-light'>
 												{photo.processing
 													? 'przetwarzanie…'
 													: formatDuration(photo.duration) || 'film'}
@@ -864,7 +863,7 @@ export default function PhotoBooth() {
 
 				{photos.length === 0 && !busy && (
 					<div className='text-center py-20 text-text-main/40 font-serif italic'>
-						Nie ma jeszcze żadnych zdjęć. Bądź pierwszy!
+						Nie ma jeszcze żadnych zdjęć ani filmów. Bądź pierwszy!
 					</div>
 				)}
 			</div>
