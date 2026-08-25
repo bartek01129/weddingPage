@@ -553,15 +553,15 @@ export default function PhotoBooth() {
 						{/* INPUT DLA FILMU — osobny wiersz, nie trzeci kafelek: trzy
 						    równe przyciski robią się nieklikalne na wąskim telefonie. */}
 						<div className='mt-3'>
-							{/* BEZ capture. Ten atrybut otwiera kamerę w trybie „szybkiego
-							    nagrania": iOS zjeżdża wtedy do ~480p, a Android startuje
-							    z najniższego profilu kamery — stąd tragiczna jakość.
-							    Bez niego telefon pokazuje wybór („Nagraj film" / biblioteka)
-							    i nagrywa w pełnej rozdzielczości swojego aparatu.
-							    Jedno tapnięcie więcej, kilka razy lepszy obraz. */}
+							{/* Świadomie BEZ capture. Ten atrybut wskakiwał od razu w tryb
+							    szybkiego nagrania, który tnie jakość (iOS ~480p, Android
+							    najniższy profil kamery). Bez niego telefon otwiera wybór
+							    nagrań — gość wskazuje film nakręcony własnym aparatem,
+							    w pełnej jakości, jaką ustawił u siebie. */}
 							<input
 								type='file'
 								accept='video/*'
+								multiple
 								onChange={onInputChange}
 								id='video-input'
 								className='hidden'
@@ -576,14 +576,16 @@ export default function PhotoBooth() {
 									stroke='currentColor'
 									viewBox='0 0 24 24'
 								>
+									{/* Taśma filmowa, nie kamera: przycisk wybiera gotowe
+									    nagranie, nie uruchamia nagrywania. */}
 									<path
 										strokeLinecap='round'
 										strokeLinejoin='round'
-										strokeWidth={2}
-										d='M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z'
+										strokeWidth={1.8}
+										d='M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'
 									/>
 								</svg>
-								<span className='text-sm md:text-base'>Nagraj film</span>
+								<span className='text-sm md:text-base'>Dodaj video</span>
 							</label>
 						</div>
 
