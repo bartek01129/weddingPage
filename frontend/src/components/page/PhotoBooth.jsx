@@ -1,10 +1,5 @@
 import { useState, useEffect, useCallback, useRef, memo } from 'react';
-import {
-	motion,
-	AnimatePresence,
-	useMotionValue,
-	useIsPresent,
-} from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 
 const API_URL = '/api/photos';
@@ -353,11 +348,13 @@ function LightboxPhoto({ photo, dragX, onDrag, onDragEnd }) {
 
 	return (
 		<>
+			{/* Bez `exit` — nakładka nie jest już w AnimatePresence, więc animacja
+			    wyjścia i tak nigdy by nie wystartowała. Zostawiona byłaby martwym
+			    kodem sugerującym zachowanie, którego nie ma. */}
 			<motion.img
 				key={attempt}
 				initial={{ scale: 0.9, opacity: 0 }}
 				animate={{ scale: 1, opacity: status === 'ready' ? 1 : 0 }}
-				exit={{ scale: 0.9, opacity: 0 }}
 				src={photo.web_url}
 				draggable={false}
 				drag='x'
@@ -395,32 +392,31 @@ function LightboxPhoto({ photo, dragX, onDrag, onDragEnd }) {
 	);
 }
 
-// Nakładka podglądu. `useIsPresent` jest tu ZABEZPIECZENIEM, nie ozdobą.
-// AnimatePresence trzyma element w DOM-ie, dopóki animacja wyjścia się nie
-// dokończy — a ta potrafi utknąć (gaśnie ekran telefonu, przeglądarka wstrzymuje
-// rAF, gest przeciągania przerwany w pół). Utknięta, całkowicie przezroczysta
-// warstwa `fixed inset-0 z-[100]` przechwytywała wtedy KAŻDE tapnięcie:
-// przewijanie działało dalej (schodzi na dokument pod spodem), miniatury
-// wczytywały się normalnie, ale żadne zdjęcie nie chciało się już otworzyć —
-// aż do odświeżenia strony. Kliknięcie w taką warstwę wołało zamknięcie, które
-// nic nie zmieniało, bo podgląd był już zamknięty.
-// Od momentu decyzji o zamknięciu warstwa przestaje łapać zdarzenia, nawet
-// gdyby nigdy się nie odmontowała.
+// Nakładka podglądu. ŚWIADOMIE POZA AnimatePresence — i to jest właściwa
+// naprawa zacinania się galerii.
+// AnimatePresence trzyma element w DOM-ie, dopóki animacja wyjścia nie zgłosi
+// zakończenia. Odtworzone w przeglądarce: gdy w otwartym podglądzie zmieni się
+// zdjęcie (swipe albo strzałki), zgoda na usunięcie nigdy nie przychodzi i po
+// zamknięciu zostaje niewidoczna warstwa `fixed inset-0 z-[100]`. Przechwytuje
+// wtedy KAŻDE kliknięcie: miniatury wczytują się normalnie, przewijanie działa
+// (schodzi na dokument pod spodem), widać kursor lupki `cursor-zoom-out`, ale
+// żadnego zdjęcia nie da się już otworzyć — aż do odświeżenia strony. Kliknięcie
+// w taką warstwę woła zamknięcie, które nic nie zmienia, bo podgląd jest już
+// zamknięty.
+// Bez AnimatePresence odmontowanie jest zwykłym, synchronicznym odmontowaniem
+// Reacta — wyciek jest niemożliwy z konstrukcji. Kosztem jest 0,3 s wygaszania
+// przy zamykaniu; pojawianie się (initial/animate) działa jak wcześniej.
 function LightboxShell({ onClose, children }) {
-	const isPresent = useIsPresent();
 	return (
 		<motion.div
 			initial={{ opacity: 0 }}
 			animate={{ opacity: 1 }}
-			exit={{ opacity: 0 }}
 			onClick={onClose}
 			// BEZ backdrop-blur: pod warstwą leży cała siatka (setki kafli), a
 			// backdrop-filter każe przeglądarce rozmyć ją w całości przy każdej
 			// klatce animacji otwierania. Na telefonie to sekundy zwiechy — a pod
 			// bg-black/95 tego rozmycia i tak nie widać.
-			className={`fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 cursor-zoom-out ${
-				isPresent ? '' : 'pointer-events-none'
-			}`}
+			className='fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 cursor-zoom-out'
 		>
 			{children}
 		</motion.div>
@@ -902,9 +898,8 @@ export default function PhotoBooth() {
 				<div ref={sentinelRef} aria-hidden='true' className='h-px w-full' />
 
 				{/* LIGHTBOX - Widok pełnoekranowy */}
-				<AnimatePresence>
-					{selectedPhoto && (
-						<LightboxShell key='lightbox' onClose={() => setSelectedId(null)}>
+				{selectedPhoto && (
+					<LightboxShell onClose={() => setSelectedId(null)}>
 							<button
 								onClick={() => setSelectedId(null)}
 								className='absolute top-6 right-6 text-white/70 hover:text-white transition-colors z-[110]'
@@ -978,11 +973,12 @@ export default function PhotoBooth() {
 								// Film NIE dostaje drag='x': przeciąganie zjadałoby natywne
 								// kontrolki (przewijanie, głośność). Nawigacja zostaje na
 								// strzałkach i klawiaturze, a to jest ważniejsze niż swipe.
+								// Bez `exit` — jak przy zdjęciu wyżej: poza AnimatePresence
+								// nie ma czego animować przy odmontowaniu.
 								<motion.div
 									key={selectedPhoto.id}
 									initial={{ scale: 0.9, opacity: 0 }}
 									animate={{ scale: 1, opacity: 1 }}
-									exit={{ scale: 0.9, opacity: 0 }}
 									className='flex flex-col items-center gap-4 max-w-full'
 									onClick={(e) => e.stopPropagation()}
 								>
@@ -1020,9 +1016,8 @@ export default function PhotoBooth() {
 									onDragEnd={handleDragEnd}
 								/>
 							)}
-						</LightboxShell>
-					)}
-				</AnimatePresence>
+					</LightboxShell>
+				)}
 
 				{photos.length === 0 && !busy && (
 					<div className='text-center py-20 text-text-main/40 font-serif italic'>
