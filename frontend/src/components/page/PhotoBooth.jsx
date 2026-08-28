@@ -1,5 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence, useMotionValue } from 'framer-motion';
+import { useState, useEffect, useCallback, useRef, memo } from 'react';
+import {
+	motion,
+	AnimatePresence,
+	useMotionValue,
+	useIsPresent,
+} from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 
 const API_URL = '/api/photos';
@@ -224,17 +229,216 @@ async function uploadToServer(file, url, onProgress) {
 	}
 }
 
+// Kafel siatki — WYDZIELONY I MEMOIZOWANY ŚWIADOMIE.
+// Wcześniej stan „załadowanych" miniatur leżał w rodzicu jako jeden Set i każde
+// dociągnięte zdjęcie robiło `new Set([...prev, id])`, czyli PEŁNY re-render
+// całej siatki. Przy kilkuset kaflach (visibleCount tylko rośnie) każde
+// kliknięcie, każdy onLoad i każde odpytanie serwera kosztowały setki
+// milisekund zablokowanego głównego wątku. Objaw był mylący: przewijanie
+// działało dalej, bo scroll obsługuje kompozytor, ale tapnięcie w zdjęcie
+// nie miało kiedy się wykonać i podgląd się nie otwierał. Odświeżenie
+// „naprawiało", bo siatka wracała do 40 kafli.
+const PhotoTile = memo(function PhotoTile({ photo, isAdmin, onSelect, onDelete }) {
+	const [status, setStatus] = useState('loading'); // loading | ready | error
+	const [attempt, setAttempt] = useState(0);
+
+	const retry = (e) => {
+		e.stopPropagation();
+		setStatus('loading');
+		setAttempt((n) => n + 1); // nowy key = nowe <img> = ponowne pobranie
+	};
+
+	return (
+		<motion.div
+			initial={{ opacity: 0, scale: 0.92 }}
+			animate={{ opacity: 1, scale: 1 }}
+			exit={{ opacity: 0, scale: 0.92 }}
+			onClick={() => onSelect(photo.id)}
+			className='group relative aspect-[3/4] rounded-2xl overflow-hidden shadow-soft bg-white border-4 border-white cursor-pointer'
+		>
+			<div className='relative w-full h-full bg-accent-green/10'>
+				{status === 'loading' && (
+					<div className='absolute inset-0 bg-gradient-to-br from-accent-green/10 to-accent-gold/10 animate-pulse rounded-2xl' />
+				)}
+				<img
+					key={attempt}
+					src={photo.thumb_url}
+					alt='Wedding moment'
+					loading='lazy'
+					decoding='async'
+					onLoad={() => setStatus('ready')}
+					onError={() => setStatus('error')}
+					className={`w-full h-full object-cover transition-all duration-500 group-hover:scale-105 ${
+						status === 'ready' ? 'opacity-100' : 'opacity-0'
+					}`}
+				/>
+				{status === 'error' && (
+					// Przeglądarka NIE ponawia nieudanego <img> sama z siebie. Bez tego
+					// kafel pulsował w nieskończoność i wyglądał jak wieczne ładowanie.
+					<button
+						onClick={retry}
+						className='absolute inset-0 flex flex-col items-center justify-center gap-1 px-2 text-center text-[11px] font-light text-accent-green/80 bg-cream/80'
+					>
+						<svg
+							className='w-5 h-5'
+							fill='none'
+							stroke='currentColor'
+							viewBox='0 0 24 24'
+						>
+							<path
+								strokeLinecap='round'
+								strokeLinejoin='round'
+								strokeWidth={1.8}
+								d='M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15'
+							/>
+						</svg>
+						Nie wczytano — dotknij
+					</button>
+				)}
+				{photo.kind === 'video' && (
+					<>
+						{/* Znacznik filmu w języku papeterii: krem, złoty
+						    hairline, zielona strzałka — nie czarne szkło. */}
+						<div className='pointer-events-none absolute inset-0 flex items-center justify-center'>
+							<span className='flex items-center justify-center w-14 h-14 rounded-full bg-cream/90 backdrop-blur-[2px] border border-accent-gold/70 shadow-soft transition-transform duration-500 group-hover:scale-110'>
+								<svg
+									className='w-5 h-5 translate-x-[2px] text-accent-green'
+									viewBox='0 0 24 24'
+									fill='currentColor'
+								>
+									<path d='M8 5v14l11-7z' />
+								</svg>
+							</span>
+						</div>
+						<span className='pointer-events-none absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-cream/90 border border-accent-gold/40 text-[11px] tracking-wide text-accent-green font-light'>
+							{photo.processing
+								? 'przetwarzanie…'
+								: formatDuration(photo.duration) || 'film'}
+						</span>
+					</>
+				)}
+				{isAdmin && (
+					<button
+						onClick={(e) => onDelete(e, photo)}
+						title={photo.kind === 'video' ? 'Usuń film' : 'Usuń zdjęcie'}
+						className='absolute top-2 right-2 z-10 p-1.5 rounded-lg bg-accent-green/70 text-white/85 hover:text-white hover:bg-red-500/80 transition-colors'
+					>
+						<svg
+							className='w-4 h-4'
+							fill='none'
+							stroke='currentColor'
+							viewBox='0 0 24 24'
+						>
+							<path
+								strokeLinecap='round'
+								strokeLinejoin='round'
+								strokeWidth={1.8}
+								d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M4 7h16M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3'
+							/>
+						</svg>
+					</button>
+				)}
+			</div>
+		</motion.div>
+	);
+});
+
+// Zdjęcie w podglądzie. Wersja web (1600 px) leci dopiero po kliknięciu, więc
+// MUSI mieć własny stan: bez tego wolne łącze dawało czarny ekran bez żadnego
+// sygnału, a nieudane pobranie — czarny ekran na zawsze, bo przeglądarka nie
+// ponawia <img> sama.
+function LightboxPhoto({ photo, dragX, onDrag, onDragEnd }) {
+	const [status, setStatus] = useState('loading'); // loading | ready | error
+	const [attempt, setAttempt] = useState(0);
+
+	return (
+		<>
+			<motion.img
+				key={attempt}
+				initial={{ scale: 0.9, opacity: 0 }}
+				animate={{ scale: 1, opacity: status === 'ready' ? 1 : 0 }}
+				exit={{ scale: 0.9, opacity: 0 }}
+				src={photo.web_url}
+				draggable={false}
+				drag='x'
+				dragDirectionLock
+				dragConstraints={{ left: 0, right: 0 }}
+				dragElastic={0.6}
+				dragMomentum={false}
+				style={{ x: dragX, touchAction: 'pan-y' }}
+				onDrag={onDrag}
+				onDragEnd={onDragEnd}
+				onLoad={() => setStatus('ready')}
+				onError={() => setStatus('error')}
+				className='max-w-full max-h-[90vh] rounded-lg shadow-2xl object-contain cursor-default select-none'
+				onClick={(e) => e.stopPropagation()}
+			/>
+			{status !== 'ready' && (
+				<div className='pointer-events-none absolute inset-0 flex items-center justify-center p-6'>
+					{status === 'loading' ? (
+						<span className='w-10 h-10 rounded-full border-2 border-white/25 border-t-white/80 animate-spin' />
+					) : (
+						<button
+							onClick={(e) => {
+								e.stopPropagation();
+								setStatus('loading');
+								setAttempt((n) => n + 1);
+							}}
+							className='pointer-events-auto px-5 py-2.5 rounded-xl border border-white/30 text-white/85 font-serif italic hover:bg-white/10 transition-colors'
+						>
+							Nie udało się wczytać — dotknij, by spróbować ponownie
+						</button>
+					)}
+				</div>
+			)}
+		</>
+	);
+}
+
+// Nakładka podglądu. `useIsPresent` jest tu ZABEZPIECZENIEM, nie ozdobą.
+// AnimatePresence trzyma element w DOM-ie, dopóki animacja wyjścia się nie
+// dokończy — a ta potrafi utknąć (gaśnie ekran telefonu, przeglądarka wstrzymuje
+// rAF, gest przeciągania przerwany w pół). Utknięta, całkowicie przezroczysta
+// warstwa `fixed inset-0 z-[100]` przechwytywała wtedy KAŻDE tapnięcie:
+// przewijanie działało dalej (schodzi na dokument pod spodem), miniatury
+// wczytywały się normalnie, ale żadne zdjęcie nie chciało się już otworzyć —
+// aż do odświeżenia strony. Kliknięcie w taką warstwę wołało zamknięcie, które
+// nic nie zmieniało, bo podgląd był już zamknięty.
+// Od momentu decyzji o zamknięciu warstwa przestaje łapać zdarzenia, nawet
+// gdyby nigdy się nie odmontowała.
+function LightboxShell({ onClose, children }) {
+	const isPresent = useIsPresent();
+	return (
+		<motion.div
+			initial={{ opacity: 0 }}
+			animate={{ opacity: 1 }}
+			exit={{ opacity: 0 }}
+			onClick={onClose}
+			// BEZ backdrop-blur: pod warstwą leży cała siatka (setki kafli), a
+			// backdrop-filter każe przeglądarce rozmyć ją w całości przy każdej
+			// klatce animacji otwierania. Na telefonie to sekundy zwiechy — a pod
+			// bg-black/95 tego rozmycia i tak nie widać.
+			className={`fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 cursor-zoom-out ${
+				isPresent ? '' : 'pointer-events-none'
+			}`}
+		>
+			{children}
+		</motion.div>
+	);
+}
+
 export default function PhotoBooth() {
 	const navigate = useNavigate();
 	const [photos, setPhotos] = useState([]);
 	const [queue, setQueue] = useState([]);
 	const [errorMsg, setErrorMsg] = useState('');
 	const [selectedId, setSelectedId] = useState(null);
-	const [loadedImages, setLoadedImages] = useState(new Set());
 	const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 	const sentinelRef = useRef(null);
-	const photosLenRef = useRef(0);
-	photosLenRef.current = photos.length;
+	// Aktualna lista dla callbacków, które nie mogą mieć `photos` w zależnościach
+	// (odpytywanie co 30 s przepinałoby wtedy nasłuchy i blokadę scrolla).
+	const photosRef = useRef(photos);
+	photosRef.current = photos;
 
 	const fetchPhotos = useCallback(async () => {
 		try {
@@ -250,9 +454,27 @@ export default function PhotoBooth() {
 						!known.has(p.public_id) &&
 						now - new Date(p.created_at).getTime() < OPTIMISTIC_WINDOW_MS,
 				);
-				return [...data, ...pending].sort(
+				// Rekordy, które się nie zmieniły, BIORĘ STARE — nie te świeżo
+				// sparsowane z JSON-a. Inaczej co 30 s każdy kafel dostawał nowy
+				// obiekt w propsach, memo nie miało czego porównać i cała siatka
+				// szła do przerenderowania, choć na serwerze nic się nie zmieniło.
+				const byId = new Map(prev.map((p) => [p.id, p]));
+				const merged = data.map((p) => {
+					const old = byId.get(p.id);
+					return old &&
+						old.video_url === p.video_url &&
+						old.processing === p.processing &&
+						old.thumb_url === p.thumb_url
+						? old
+						: p;
+				});
+				const next = [...merged, ...pending].sort(
 					(a, b) => new Date(b.created_at) - new Date(a.created_at),
 				);
+				// Nic nowego → zwracamy starą tablicę i React w ogóle nie renderuje.
+				if (next.length === prev.length && next.every((p, i) => p === prev[i]))
+					return prev;
+				return next;
 			});
 		} catch {
 			/* empty */
@@ -272,7 +494,9 @@ export default function PhotoBooth() {
 		const io = new IntersectionObserver(
 			(entries) => {
 				if (entries[0].isIntersecting) {
-					setVisibleCount((c) => (c < photosLenRef.current ? c + PAGE_SIZE : c));
+					setVisibleCount((c) =>
+						c < photosRef.current.length ? c + PAGE_SIZE : c,
+					);
 				}
 			},
 			{ rootMargin: '600px' },
@@ -352,7 +576,11 @@ export default function PhotoBooth() {
 		e.target.value = '';
 	};
 
-	const handleDeletePhoto = async (e, photo) => {
+	// Stabilne referencje: kafle są memoizowane, więc funkcja tworzona na nowo
+	// przy każdym renderze rodzica kasowałaby cały zysk z memo.
+	const handleSelect = useCallback((id) => setSelectedId(id), []);
+
+	const handleDeletePhoto = useCallback(async (e, photo) => {
 		e.stopPropagation();
 		const noun = photo.kind === 'video' ? 'film' : 'zdjęcie';
 		if (!window.confirm(`Usunąć to ${noun}?`)) return;
@@ -371,7 +599,7 @@ export default function PhotoBooth() {
 		} catch {
 			setErrorMsg('Nie udało się usunąć zdjęcia.');
 		}
-	};
+	}, []);
 
 	const selectedIndex = photos.findIndex((p) => p.id === selectedId);
 	const selectedPhoto = selectedIndex === -1 ? null : photos[selectedIndex];
@@ -417,11 +645,14 @@ export default function PhotoBooth() {
 	useEffect(() => {
 		if (selectedIndex === -1) return;
 		const handleKey = (e) => {
+			// Lista z refa, nie z domknięcia: `photos` w zależnościach oznaczałoby
+			// zdjęcie i ponowne założenie blokady scrolla przy każdym odpytaniu.
+			const list = photosRef.current;
 			if (e.key === 'Escape') setSelectedId(null);
 			else if (e.key === 'ArrowLeft' && selectedIndex > 0)
-				setSelectedId(photos[selectedIndex - 1].id);
-			else if (e.key === 'ArrowRight' && selectedIndex < photos.length - 1)
-				setSelectedId(photos[selectedIndex + 1].id);
+				setSelectedId(list[selectedIndex - 1].id);
+			else if (e.key === 'ArrowRight' && selectedIndex < list.length - 1)
+				setSelectedId(list[selectedIndex + 1].id);
 		};
 		window.addEventListener('keydown', handleKey);
 		document.body.style.overflow = 'hidden';
@@ -429,7 +660,7 @@ export default function PhotoBooth() {
 			window.removeEventListener('keydown', handleKey);
 			document.body.style.overflow = 'unset';
 		};
-	}, [selectedIndex, photos]);
+	}, [selectedIndex]);
 
 	const busy = queue.some((it) => it.status === 'uploading');
 
@@ -653,75 +884,17 @@ export default function PhotoBooth() {
 				<div className='grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6'>
 					<AnimatePresence>
 						{photos.slice(0, visibleCount).map((photo) => (
-							<motion.div
+							// `layout` celowo ZDJĘTE: framer mierzył geometrię każdego kafla
+							// przy każdym renderze siatki (wymuszony reflow × N kafli). Przy
+							// memoizowanych kaflach i tak nie miałby czego animować — bo się
+							// nie przerenderowują — została sama cena.
+							<PhotoTile
 								key={photo.id}
-								layout
-								initial={{ opacity: 0, scale: 0.92 }}
-								animate={{ opacity: 1, scale: 1 }}
-								exit={{ opacity: 0, scale: 0.92 }}
-								onClick={() => setSelectedId(photo.id)}
-								className='group relative aspect-[3/4] rounded-2xl overflow-hidden shadow-soft bg-white border-4 border-white cursor-pointer'
-							>
-								<div className='relative w-full h-full bg-accent-green/10'>
-									{!loadedImages.has(photo.id) && (
-										<div className='absolute inset-0 bg-gradient-to-br from-accent-green/10 to-accent-gold/10 animate-pulse rounded-2xl' />
-									)}
-									<img
-										src={photo.thumb_url}
-										alt='Wedding moment'
-										loading='lazy'
-										onLoad={() =>
-											setLoadedImages((prev) => new Set([...prev, photo.id]))
-										}
-										className={`w-full h-full object-cover transition-all duration-500 group-hover:scale-105 ${
-											loadedImages.has(photo.id) ? 'opacity-100' : 'opacity-0'
-										}`}
-									/>
-									{photo.kind === 'video' && (
-										<>
-											{/* Znacznik filmu w języku papeterii: krem, złoty
-											    hairline, zielona strzałka — nie czarne szkło. */}
-											<div className='pointer-events-none absolute inset-0 flex items-center justify-center'>
-												<span className='flex items-center justify-center w-14 h-14 rounded-full bg-cream/90 backdrop-blur-[2px] border border-accent-gold/70 shadow-soft transition-transform duration-500 group-hover:scale-110'>
-													<svg
-														className='w-5 h-5 translate-x-[2px] text-accent-green'
-														viewBox='0 0 24 24'
-														fill='currentColor'
-													>
-														<path d='M8 5v14l11-7z' />
-													</svg>
-												</span>
-											</div>
-											<span className='pointer-events-none absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-cream/90 border border-accent-gold/40 text-[11px] tracking-wide text-accent-green font-light'>
-												{photo.processing
-													? 'przetwarzanie…'
-													: formatDuration(photo.duration) || 'film'}
-											</span>
-										</>
-									)}
-									{ADMIN_TOKEN && (
-										<button
-											onClick={(e) => handleDeletePhoto(e, photo)}
-											title={photo.kind === 'video' ? 'Usuń film' : 'Usuń zdjęcie'}
-											className='absolute top-2 right-2 z-10 p-1.5 rounded-lg bg-accent-green/70 text-white/85 hover:text-white hover:bg-red-500/80 transition-colors'
-										>
-											<svg
-												className='w-4 h-4'
-												fill='none'
-												stroke='currentColor'
-												viewBox='0 0 24 24'
-											>
-												<path
-													strokeLinecap='round'
-													strokeLinejoin='round'
-													strokeWidth={1.8}
-													d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M4 7h16M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3'
-												/>
-											</svg>
-										</button>
-									)}
-								</div>
-							</motion.div>
+								photo={photo}
+								isAdmin={!!ADMIN_TOKEN}
+								onSelect={handleSelect}
+								onDelete={handleDeletePhoto}
+							/>
 						))}
 					</AnimatePresence>
 				</div>
@@ -731,13 +904,7 @@ export default function PhotoBooth() {
 				{/* LIGHTBOX - Widok pełnoekranowy */}
 				<AnimatePresence>
 					{selectedPhoto && (
-						<motion.div
-							initial={{ opacity: 0 }}
-							animate={{ opacity: 1 }}
-							exit={{ opacity: 0 }}
-							onClick={() => setSelectedId(null)}
-							className='fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 cursor-zoom-out'
-						>
+						<LightboxShell key='lightbox' onClose={() => setSelectedId(null)}>
 							<button
 								onClick={() => setSelectedId(null)}
 								className='absolute top-6 right-6 text-white/70 hover:text-white transition-colors z-[110]'
@@ -845,26 +1012,15 @@ export default function PhotoBooth() {
 									)}
 								</motion.div>
 							) : (
-								<motion.img
+								<LightboxPhoto
 									key={selectedPhoto.id}
-									initial={{ scale: 0.9, opacity: 0 }}
-									animate={{ scale: 1, opacity: 1 }}
-									exit={{ scale: 0.9, opacity: 0 }}
-									src={selectedPhoto.web_url}
-									draggable={false}
-									drag='x'
-									dragDirectionLock
-									dragConstraints={{ left: 0, right: 0 }}
-									dragElastic={0.6}
-									dragMomentum={false}
-									style={{ x: dragX, touchAction: 'pan-y' }}
+									photo={selectedPhoto}
+									dragX={dragX}
 									onDrag={handleDrag}
 									onDragEnd={handleDragEnd}
-									className='max-w-full max-h-[90vh] rounded-lg shadow-2xl object-contain cursor-default select-none'
-									onClick={(e) => e.stopPropagation()}
 								/>
 							)}
-						</motion.div>
+						</LightboxShell>
 					)}
 				</AnimatePresence>
 
